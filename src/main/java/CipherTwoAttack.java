@@ -85,6 +85,7 @@ class CipherTwoAttack {
             }
         }
 
+        System.out.println("These are all pairs:");
         for (int key : pairsTable.keySet()) {
             int[][] p = pairsTable.get(key);
             System.out.println(
@@ -98,7 +99,7 @@ class CipherTwoAttack {
 
         CipherTwoAttack cipherTwoAttack = new CipherTwoAttack();
         cipherTwoAttack.counter(pairsTable);
-        System.out.println(cipherTwoAttack.largest(cipherTwoAttack.counters));
+        System.out.println("Answer: " + cipherTwoAttack.largest(cipherTwoAttack.counters));
     }
 }
 
