@@ -22,13 +22,13 @@ import java.nio.ByteOrder;
 
 class Renderer2 implements GLEventListener {
 
-    private GLAutoDrawable drawable;
-
     private GLU glu = new GLU();
     Game game;
 
     public float t = 0.0f;
     int texID = 0;
+    int powerUpGrowTex;
+    int powerUpFlashTex;
 
     float[] cube = {
             // front
@@ -169,11 +169,11 @@ class Renderer2 implements GLEventListener {
         gl.glPopMatrix();
     }
 
-    public void drawBat(GL2 gl, float x, float y, float[] cube, float rotation, float scale) {
+    public void drawBat(GL2 gl, Player player, float x, float y, float[] cube, float rotation, float scale) {
         gl.glPushMatrix();
         gl.glTranslatef(x, y, -2.0f);
         gl.glRotatef(rotation, 0, 0, 1);
-        gl.glScalef(scale / 2, scale * 3, scale / 2);
+        gl.glScalef(scale / 2, player.paddleHeight, scale / 2);
 
         gl.glBegin(GL2.GL_QUADS);
 
@@ -232,12 +232,51 @@ class Renderer2 implements GLEventListener {
         gl.glPopMatrix();
     }
 
+    float[] fullFaceUV = {
+            0.0f, 0.0f,
+            1.0f, 0.0f,
+            1.0f, 1.0f,
+            0.0f, 1.0f
+    };
+
+
+    public void drawPowerUp(GL2 gl, PowerUp powerUp, float[] cube, float scale) {
+        if (!powerUp.active) return;
+
+        int tex = (powerUp.type == 1) ? powerUpFlashTex : powerUpGrowTex;
+
+        gl.glEnable(GL2.GL_TEXTURE_2D);
+        gl.glBindTexture(GL2.GL_TEXTURE_2D, tex);
+
+        gl.glPushMatrix();
+        gl.glTranslatef(powerUp.posX, powerUp.posY, -2.0f);
+        gl.glScalef(scale, scale, scale);
+
+        for (int face = 0; face < 6; face++) {
+            int v = face * 12; // 4 vertices × 3 floats
+            gl.glBegin(GL2.GL_QUADS);
+            for (int vert = 0; vert < 4; vert++) {
+                gl.glTexCoord2f(fullFaceUV[vert * 2], fullFaceUV[vert * 2 + 1]);
+                gl.glVertex3f(cube[v + vert * 3], cube[v + vert * 3 + 1], cube[v + vert * 3 + 2]);
+            }
+            gl.glEnd();
+        }
+
+        gl.glDisable(GL2.GL_TEXTURE_2D);
+        gl.glPopMatrix();
+    }
+
+
+
     @Override
     public void init(GLAutoDrawable d) {
         game = new Game();
         GL2 gl = d.getGL().getGL2();
         gl.glEnable(GL.GL_DEPTH_TEST);
         texID = loadTexture(d, "interstellar.png");
+        powerUpGrowTex = loadTexture(d, "powerup_icons_grow.png");
+        powerUpFlashTex = loadTexture(d, "powerup_icons_flash.png");
+
     }
 
     @Override
@@ -257,26 +296,25 @@ class Renderer2 implements GLEventListener {
     @Override
     public void display (GLAutoDrawable d) {
 
-
         GL2 gl = d.getGL().getGL2();  // get the OpenGL 2 graphics context
         //gl.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         gl.glMatrixMode(GL2.GL_MODELVIEW);
         gl.glLoadIdentity();
         gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
-
         //gl.glLoadIdentity();
         //gl.glOrtho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
         //gl.glColor3f(1.0f, 1.0f, 1.0f);
 
         drawCube(gl, game.ball.posx, game.ball.posy, cube, game.ball.rotation, 0.05f);
-        drawBat(gl, game.player1.posX, game.player1.posY, cube, 0.0f, 0.1f);
-        drawBat(gl, game.player2.posX, game.player2.posY, cube, 0.0f, 0.1f);
-
+        drawBat(gl, game.player1, game.player1.posX, game.player1.posY, cube, 0.0f, 0.1f);
+        drawBat(gl, game.player2, game.player2.posX, game.player2.posY, cube, 0.0f, 0.1f);
 
         drawPlayingField(gl, 0.0f, 0.0f, cube, colorCube, t, 2.0f);
         float offset = 0.01f;
         t += offset;
+
+        drawPowerUp(gl, game.powerUp, cube, 0.07f);
 
         switch (game.scoreP1) {
             case 0:
@@ -461,12 +499,24 @@ class MyGui2 extends JFrame {
 }
 
 class Game {
+
     public Ball ball = new Ball(0, 0, 0.6f, 0.2f);
     public Player player1 = new Player(-0.9f, 0);
     public Player player2 = new Player(0.9f, 0);
+
+    public PowerUp powerUp;
+    public Player lastTouched = player1;
+    public boolean powerUpActive = false;
+    public long powerUpStartTime;
+    public int powerUpType;
+
     int scoreP1 = 0;
     int scoreP2 = 0;
     boolean gameOver = true;
+
+    public Game() {
+        powerUp = new PowerUp("");
+    }
 
     public void step() {
 
@@ -482,15 +532,98 @@ class Game {
                 gameOver = true;
             }
 
+            // track last touched player
+            if ((ball.oldPosX < player1.posX && ball.posx >= player1.posX) ||
+                    (ball.oldPosX > player1.posX && ball.posx <= player1.posX))
+                lastTouched = player1;
+
+            if ((ball.oldPosX < player2.posX && ball.posx >= player2.posX) ||
+                    (ball.oldPosX > player2.posX && ball.posx <= player2.posX))
+                lastTouched = player2;
+
+
+
+            // power-up collision
+            if (powerUp.isHit(ball)) {
+                powerUp.pickUp();
+                applyPowerUp(lastTouched);
+            }
+
+            // power-up duration
+            if (powerUpActive && System.currentTimeMillis() - powerUpStartTime > 4000) {
+                removePowerUp(lastTouched);
+            }
+
+            // scoring
             if (ball.posx >= 1.0f) {
                 scoreP1++;
-                ball = new Ball(0,0, -0.6f, 0.0f);
+                resetBall(-0.6f);
+                spawnPowerUpIfNeeded();
             } else if (ball.posx <= -1.0f) {
                 scoreP2++;
-                ball = new Ball(0,0, 0.6f, 0.0f);
+                resetBall(0.6f);
+                spawnPowerUpIfNeeded();
+            }
+            powerUp.move();
+        }
+    }
+
+
+
+
+    private void resetBall(float velX) {
+        ball = new Ball(0, 0, velX, 0);
+
+        powerUp.active = false;
+
+
+        powerUp.posY = -1.0f;
+
+        if (powerUpActive) {
+            player1.removeSpeedBoost();
+            player1.resetPaddleSize();
+            player2.removeSpeedBoost();
+            player2.resetPaddleSize();
+        }
+        powerUpActive = false;
+    }
+
+
+    private void spawnPowerUpIfNeeded() {
+        if (!powerUp.active && !powerUpActive) {
+            if ((scoreP1 == 1 && scoreP2 == 0) ||
+                    (scoreP1 == 0 && scoreP2 == 1) ||
+                    (scoreP1 == 2 && scoreP2 == 1) ||
+                    (scoreP1 == 1 && scoreP2 == 2)) {
+
+                powerUp.active = true;
+                powerUp.posX = 0f;
+                powerUp.posY = -1.0f;
+                powerUp.type = (int)(Math.random() * 2) + 1;
+                powerUp.velY = Math.abs(powerUp.velY);
             }
         }
     }
+
+        private void applyPowerUp (Player player){
+            powerUpActive = true;
+            powerUpStartTime = System.currentTimeMillis();
+            powerUpType = powerUp.type;
+
+            switch (powerUpType) {
+                case 1 -> player.applySpeedBoost();
+                case 2 -> player.enlargePaddle();
+            }
+        }
+
+        private void removePowerUp (Player player){
+            powerUpActive = false;
+            switch (powerUpType) {
+                case 1 -> player.removeSpeedBoost();
+                case 2 -> player.resetPaddleSize();
+            }
+        }
+
 }
 
 class Ball {
@@ -549,10 +682,10 @@ class Ball {
             posx = player.posX + ballRadius;
         }
 
-        velx = -velx * 1.07f;
+        velx = -velx * 1.04f;
 
         float hitOffsetY = this.posy - player.posY;
-        float spinFactor = 35.0f;
+        float spinFactor = 15.0f;
         rotationspeed += hitOffsetY * spinFactor * Math.signum(-velx);
 
         float magnus = rotationspeed * 0.0015f;
@@ -568,6 +701,11 @@ class Player {
     float posX;
     float posY;
     float velY;
+    float paddleHeight = 0.25f;
+    float originalHeight = 0.25f;
+
+    boolean speedBoost = false;
+    boolean enlarge = false;
 
     public Player(float posX, float posY) {
         this.posX = posX;
@@ -575,25 +713,52 @@ class Player {
         this.velY = 0;
     }
 
-    public void move() {
-        posY += velY;
-    }
+    public void move() { posY += velY; }
 
-    public void startMovingUp() {
-        velY = 0.04f;
-    }
+    public void startMovingUp() { velY = speedBoost ? 0.08f : 0.04f; }
+    public void startMovingDown() { velY = speedBoost ? -0.08f : -0.04f; }
+    public void stopMoving() { velY = 0; }
 
-    public void startMovingDown() {
-        velY = -0.04f;
-    }
+    public void applySpeedBoost() { speedBoost = true; }
+    public void removeSpeedBoost() { speedBoost = false; }
 
-    public void stopMoving() {
-        velY = 0;
-    }
+    public void enlargePaddle() { paddleHeight *= 1.5f; enlarge = true; }
+    public void resetPaddleSize() { paddleHeight = originalHeight; enlarge = false; }
 }
+
 
 class PowerUp {
 
+    public float posX = 0;
+    public float posY = -1;
+    public float velY = 0.025f;
+    public boolean active = false;
+    public int type; // 1 = speed, 2 = enlarge
+    public String texID;
+
+    public PowerUp(String texID) {
+        this.texID = texID;
+        type = (int)(Math.random() * 2) + 1;
+    }
+
+    public void move() {
+        if (!active) return; // do nothing when not active
+
+        posY += velY;
+        if (posY > 1.0f || posY < -1.0f) velY = -velY;
+    }
+
+
+    public boolean isHit(Ball ball) {
+        if (!active) return false;
+        float dx = Math.abs(ball.posx - posX);
+        float dy = Math.abs(ball.posy - posY);
+        return dx < 0.05f && dy < 0.05f;
+    }
+
+    public void pickUp() {
+        active = false;
+    }
 }
 
 public class TriangleTransform {
