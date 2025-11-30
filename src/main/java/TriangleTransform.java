@@ -5,6 +5,7 @@
 import javax.imageio.ImageIO;
 import javax.swing.*;
 
+import com.jogamp.common.nio.Buffers;
 import com.jogamp.opengl.*;
 import com.jogamp.opengl.awt.GLCanvas;
 import com.jogamp.opengl.glu.GLU;
@@ -13,12 +14,10 @@ import com.jogamp.opengl.util.FPSAnimator;
 import java.awt.event.KeyAdapter;
 import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
+import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.FloatBuffer;
 
 class Renderer2 implements GLEventListener {
 
@@ -29,6 +28,12 @@ class Renderer2 implements GLEventListener {
     int texID = 0;
     int powerUpGrowTex;
     int powerUpFlashTex;
+
+    // new variables for VBO's
+    private int[] vertBufID = new int[1];
+    private int texIdBall = 0;
+    private int texIdPlayer = 0;
+    private int vertNo = 0;
 
     float[] cube = {
             // front
@@ -273,9 +278,33 @@ class Renderer2 implements GLEventListener {
         game = new Game();
         GL2 gl = d.getGL().getGL2();
         gl.glEnable(GL.GL_DEPTH_TEST);
+
         texID = loadTexture(d, "interstellar.png");
         powerUpGrowTex = loadTexture(d, "powerup_icons_grow.png");
         powerUpFlashTex = loadTexture(d, "powerup_icons_flash.png");
+
+
+        // assuming the following structure of input vertex data
+        // struct Vertex {
+        //   float position[3];
+        //   float color[4];
+        //   float texCoord[2];
+        //   float normal[3];
+        // };
+
+        int perVertexFloats = (3+4+2+3);
+        float ballVertexData[] = loadVertexData("ball.vbo", perVertexFloats);
+        float playerVertexData[] = loadVertexData("player.vbo", perVertexFloats);
+
+        vertNo = ballVertexData.length / perVertexFloats;
+        FloatBuffer dataIn = Buffers.newDirectFloatBuffer(ballVertexData.length);
+        dataIn.put(ballVertexData);
+        dataIn.flip();
+
+        // generating vertex VBO
+        gl.glGenBuffers(1, vertBufID, 0);
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufID[0]);
+        gl.glBufferData(GL2.GL_ARRAY_BUFFER, dataIn.capacity()*Buffers.SIZEOF_FLOAT, dataIn, GL2.GL_STATIC_DRAW);
 
     }
 
@@ -297,14 +326,10 @@ class Renderer2 implements GLEventListener {
     public void display (GLAutoDrawable d) {
 
         GL2 gl = d.getGL().getGL2();  // get the OpenGL 2 graphics context
-        //gl.glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
         gl.glMatrixMode(GL2.GL_MODELVIEW);
         gl.glLoadIdentity();
-        gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
-        //gl.glLoadIdentity();
-        //gl.glOrtho(-1.0f, 1.0f, -1.0f, 1.0f, -1.0f, 1.0f);
-        //gl.glColor3f(1.0f, 1.0f, 1.0f);
+        gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
         drawCube(gl, game.ball.posx, game.ball.posy, cube, game.ball.rotation, 0.05f);
         drawBat(gl, game.player1, game.player1.posX, game.player1.posY, cube, 0.0f, 0.1f);
@@ -346,6 +371,72 @@ class Renderer2 implements GLEventListener {
                 break;
         }
         game.step();
+
+        // activating VBO
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufID[0]);
+        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
+        int offsetVBO = 0;
+
+        // position
+        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+        // color
+        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
+        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+        // texture
+        offsetVBO = 0 + (3+4)*Buffers.SIZEOF_FLOAT;
+        gl.glTexCoordPointer(2, GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
+
+        // normals
+        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
+        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+
+        // render data
+        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNo);
+
+        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
+        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
+        gl.glDisableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
+        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
+        gl.glDisable(GL2.GL_TEXTURE_2D);
+
+        gl.glFlush();
+    }
+
+    private float[] loadVertexData(String filename, int perVertexFloats) {
+
+        float[] floatArray = new float[0];
+        // read vertex data from file
+        int vertSize = 0;
+        try {
+            InputStream is = new FileInputStream(new File(filename));
+            BufferedReader br = new BufferedReader(new InputStreamReader(is));
+            String line = br.readLine();
+            if (line != null) {
+                vertSize = Integer.parseInt(line);
+                floatArray = new float[vertSize];
+            }
+            int i = 0;
+            while ((line = br.readLine()) != null && i < floatArray.length) {
+                floatArray[i] = Float.parseFloat(line);
+                i++;
+            }
+            if (i != vertSize || (vertSize % perVertexFloats) != 0) {
+                floatArray = new float[0];
+            }
+            br.close();
+        } catch (FileNotFoundException e) {
+            System.out.println("Can not find vbo data file " + filename);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        return floatArray;
     }
 
     @Override
@@ -391,8 +482,6 @@ class Renderer2 implements GLEventListener {
                 }
             }
             buffer.rewind();
-
-
 
             // data is aligned in byte order
             gl.glPixelStorei(GL2.GL_UNPACK_ALIGNMENT, 1);
