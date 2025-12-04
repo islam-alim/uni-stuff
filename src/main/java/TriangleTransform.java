@@ -30,10 +30,10 @@ class Renderer2 implements GLEventListener {
     int powerUpFlashTex;
 
     // new variables for VBO's
-    private int[] vertBufID = new int[1];
-    private int texIdBall = 0;
-    private int texIdPlayer = 0;
-    private int vertNo = 0;
+    private int[] vertBufIdBall = new int[1];
+    private int[] vertBufIdPlayer = new int[1];
+    private int vertNoBall = 0;
+    private int vertNoPlayer = 0;
 
     float[] cube = {
             // front
@@ -146,13 +146,13 @@ class Renderer2 implements GLEventListener {
         gl.glPopMatrix();
     }
 
-    public void drawCube(GL2 gl, float x, float y, float[] cube, float rotation, float scale) {
+    public void drawCube(GL2 gl, float x, float y, float rotation, float scale) {
         gl.glPushMatrix();
         gl.glTranslatef(x, y, -2.0f);
         gl.glRotatef(rotation, 0, 0, 1);
         gl.glScalef(scale, scale, scale);
 
-        gl.glBegin(GL2.GL_QUADS);
+        /*gl.glBegin(GL2.GL_QUADS);
 
         float[][] colors = {
                 {1.0f, 1.0f, 1.0f},
@@ -170,17 +170,45 @@ class Renderer2 implements GLEventListener {
                 gl.glVertex3f(cube[idx], cube[idx + 1], cube[idx + 2]);
             }
         }
-        gl.glEnd();
+        gl.glEnd();*/
+
+        // activating Ball VBO
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdBall[0]);
+        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
+        int offsetVBO = 0;
+
+        // position
+        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+        // color
+        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
+        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+        // normals
+        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
+        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+        // render data
+        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoBall);
+        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPlayer);
+
+        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
+        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
+        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
+
         gl.glPopMatrix();
     }
 
-    public void drawBat(GL2 gl, Player player, float x, float y, float[] cube, float rotation, float scale) {
+    public void drawBat(GL2 gl, Player player, float x, float y, float rotation, float scale) {
         gl.glPushMatrix();
         gl.glTranslatef(x, y, -2.0f);
         gl.glRotatef(rotation, 0, 0, 1);
         gl.glScalef(scale / 2, player.paddleHeight, scale / 2);
 
-        gl.glBegin(GL2.GL_QUADS);
+        /*gl.glBegin(GL2.GL_QUADS);
 
         float[][] colors = {
                 {1.0f, 1.0f, 1.0f},
@@ -198,7 +226,35 @@ class Renderer2 implements GLEventListener {
                 gl.glVertex3f(cube[idx], cube[idx + 1], cube[idx + 2]);
             }
         }
-        gl.glEnd();
+        gl.glEnd();*/
+
+        // activating Player VBO
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
+        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
+        int offsetVBO = 0;
+
+        // position
+        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+        // color
+        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
+        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+        // normals
+        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
+        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
+        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+        // render data
+        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoBall);
+        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPlayer);
+
+        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
+        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
+        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
+
         gl.glPopMatrix();
     }
 
@@ -296,15 +352,25 @@ class Renderer2 implements GLEventListener {
         float ballVertexData[] = loadVertexData("ball.vbo", perVertexFloats);
         float playerVertexData[] = loadVertexData("player.vbo", perVertexFloats);
 
-        vertNo = ballVertexData.length / perVertexFloats;
-        FloatBuffer dataIn = Buffers.newDirectFloatBuffer(ballVertexData.length);
-        dataIn.put(ballVertexData);
-        dataIn.flip();
+        vertNoBall = ballVertexData.length / perVertexFloats;
+        FloatBuffer dataIn1 = Buffers.newDirectFloatBuffer(ballVertexData.length);
+        dataIn1.put(ballVertexData);
+        dataIn1.flip();
 
-        // generating vertex VBO
-        gl.glGenBuffers(1, vertBufID, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufID[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, dataIn.capacity()*Buffers.SIZEOF_FLOAT, dataIn, GL2.GL_STATIC_DRAW);
+        // generating Ball vertex VBO
+        gl.glGenBuffers(1, vertBufIdBall, 0);
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdBall[0]);
+        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn1.capacity() *Buffers.SIZEOF_FLOAT, dataIn1, GL2.GL_STATIC_DRAW);
+
+        vertNoPlayer = playerVertexData.length / perVertexFloats;
+        FloatBuffer dataIn2 = Buffers.newDirectFloatBuffer(playerVertexData.length);
+        dataIn2.put(playerVertexData);
+        dataIn2.flip();
+
+        // generating Player vertex VBO
+        gl.glGenBuffers(1, vertBufIdPlayer, 0);
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
+        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn2.capacity() *Buffers.SIZEOF_FLOAT, dataIn2, GL2.GL_STATIC_DRAW);
 
     }
 
@@ -328,12 +394,11 @@ class Renderer2 implements GLEventListener {
         GL2 gl = d.getGL().getGL2();  // get the OpenGL 2 graphics context
         gl.glMatrixMode(GL2.GL_MODELVIEW);
         gl.glLoadIdentity();
-
         gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
-        drawCube(gl, game.ball.posx, game.ball.posy, cube, game.ball.rotation, 0.05f);
-        drawBat(gl, game.player1, game.player1.posX, game.player1.posY, cube, 0.0f, 0.1f);
-        drawBat(gl, game.player2, game.player2.posX, game.player2.posY, cube, 0.0f, 0.1f);
+        drawCube(gl, game.ball.posx, game.ball.posy, game.ball.rotation, 0.15f);
+        drawBat(gl, game.player1, game.player1.posX, game.player1.posY, 270.0f, 1f);
+        drawBat(gl, game.player2, game.player2.posX, game.player2.posY, 90.0f, 1f);
 
         drawPlayingField(gl, 0.0f, 0.0f, cube, colorCube, t, 2.0f);
         float offset = 0.01f;
@@ -372,41 +437,6 @@ class Renderer2 implements GLEventListener {
         }
         game.step();
 
-        // activating VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufID[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // texture
-        offsetVBO = 0 + (3+4)*Buffers.SIZEOF_FLOAT;
-        gl.glTexCoordPointer(2, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-
-        // render data
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNo);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
-        gl.glDisable(GL2.GL_TEXTURE_2D);
-
-        gl.glFlush();
     }
 
     private float[] loadVertexData(String filename, int perVertexFloats) {
@@ -657,9 +687,6 @@ class Game {
         }
     }
 
-
-
-
     private void resetBall(float velX) {
         ball = new Ball(0, 0, velX, 0);
 
@@ -754,27 +781,44 @@ class Ball {
     }
 
     public void touches(Player player) {
-        boolean crossed = (oldPosX < player.posX && posx >= player.posX) ||
-                (oldPosX > player.posX && posx <= player.posX);
-
-        if (!crossed) return;
-
-        float dy = Math.abs(this.posy - player.posY);
-        float verticalThreshold = 0.25f;
-        if (dy > verticalThreshold) return;
-
+        float batRadius = player.paddleHeight * 0.19f;   // ~ one fifth of height
         float ballRadius = 0.04f;
 
-        if (player.posX > 0) {
-            posx = player.posX - ballRadius;
-        } else {
-            posx = player.posX + ballRadius;
-        }
+        float batCenterX = player.posX;
+        float batCenterY = player.posY;
 
-        velx = -velx * 1.04f;
+        // distance ball to the bat center
+        float dx = posx - batCenterX;
+        float dy = posy - batCenterY;
 
-        float hitOffsetY = this.posy - player.posY;
+        float dist2 = dx * dx + dy * dy;
+        float minDist = batRadius + ballRadius;
+
+        // rounded collision check
+        if (dist2 > minDist * minDist) return;
+
+        float dist = (float) Math.sqrt(dist2);
+
+        // normal vector at hit point
+        float nx = dx / dist;
+        float ny = dy / dist;
+
+        // vector reflection
+        float dot = velx * nx + vely * ny;
+
+        velx = velx - 2.0f * dot * nx;
+        vely = vely - 2.0f * dot * ny;
+
+        velx *= 1.04f;
+
+        // push ball out of bat
+        float overlap = minDist - dist;
+        posx += overlap * nx;
+        posy += overlap * ny;
+
+        float hitOffsetY = posy - player.posY;
         float spinFactor = 15.0f;
+
         rotationspeed += hitOffsetY * spinFactor * Math.signum(-velx);
 
         float magnus = rotationspeed * 0.0015f;
@@ -790,8 +834,8 @@ class Player {
     float posX;
     float posY;
     float velY;
-    float paddleHeight = 0.25f;
-    float originalHeight = 0.25f;
+    float paddleHeight = 1f;
+    float originalHeight = 1f;
 
     boolean speedBoost = false;
     boolean enlarge = false;
@@ -844,7 +888,6 @@ class PowerUp {
         float dy = Math.abs(ball.posy - posY);
         return dx < 0.05f && dy < 0.05f;
     }
-
     public void pickUp() {
         active = false;
     }
