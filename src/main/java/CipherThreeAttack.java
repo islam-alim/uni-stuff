@@ -22,7 +22,6 @@ class CipherThreeAttack {
                 if ((y0 ^ y1) == 12) {
                     counters[k3]++;
                 }
-
             }
         }
     }
