@@ -47,143 +47,30 @@ class Renderer2 implements GLEventListener {
     private int vertNo_3 = 0;
     private int vertNoPowerUp = 0;
 
+    // VAO ID's
+    private int[] vaoBall = new int[1];
+    private int[] vaoPlayer = new int[1];
+    private int[] vaoPlayingField = new int[1];
+    private int[] vaoPowerUp = new int[1];
+    private int powerUpVertexCount;
+    private int[] vaoDigits = new int[4]; // 0,1,2,3
+    private static final int STRIDE = (3+4+2+3) * Buffers.SIZEOF_FLOAT;
 
-    public void drawScoreZero (GL2 gl, float x, float y, float rotation) {
+
+    public void drawDigit(GL2 gl, float x, float y, int digit, int vertexCount) {
         gl.glPushMatrix();
 
-        gl.glTranslatef(x, y - 0.01f, -2.0f);
-        gl.glRotatef(rotation,0.0f,0.0f, 1.0f);
-        gl.glScalef(0.25f,0.25f,0.25f);
+        gl.glTranslatef(x, y, -2.0f);
+        gl.glRotatef(0, 0, 0, 1);
+        gl.glScalef(0.25f, 0.25f, 0.25f);
 
-        // activating ScoreZero VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_0[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
+        gl.glBindVertexArray(vaoDigits[digit]);
+        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertexCount);
+        gl.glBindVertexArray(0);
 
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNo_0);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
         gl.glPopMatrix();
     }
 
-    public void drawScoreOne (GL2 gl, float x, float y, float rotation) {
-        gl.glPushMatrix();
-        gl.glTranslatef(x, y - 0.01f, -2.0f);
-        gl.glRotatef(rotation,0.0f,0.0f, 1.0f);
-        gl.glScalef(0.25f,0.25f,0.25f);
-
-        // activating ScoreZero VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_1[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNo_1);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
-        gl.glPopMatrix();
-    }
-
-    public void drawScoreTwo (GL2 gl, float x, float y, float rotation) {
-        gl.glPushMatrix();
-        gl.glTranslatef(x, y - 0.01f, -2.0f);
-        gl.glRotatef(rotation,0.0f,0.0f, 1.0f);
-        gl.glScalef(0.25f,0.25f,0.25f);
-
-        // activating ScoreZero VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_2[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNo_2);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
-        gl.glPopMatrix();
-    }
-
-    public void drawScoreThree (GL2 gl, float x, float y, float rotation) {
-        gl.glPushMatrix();
-        gl.glTranslatef(x, y - 0.01f, -2.0f);
-        gl.glRotatef(rotation,0.0f,0.0f, 1.0f);
-        gl.glScalef(0.25f,0.25f,0.25f);
-
-        // activating ScoreZero VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_3[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNo_3);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
-        gl.glPopMatrix();
-    }
 
 
     public void drawCube(GL2 gl, float x, float y, float rotation, float scale) {
@@ -192,35 +79,13 @@ class Renderer2 implements GLEventListener {
         gl.glRotatef(rotation, 0, 0, 1);
         gl.glScalef(scale, scale, scale);
 
-        // activating Ball VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdBall[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
+        gl.glBindVertexArray(vaoBall[0]);
         gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoBall);
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPlayer);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
+        gl.glBindVertexArray(0);
 
         gl.glPopMatrix();
     }
+
 
     public void drawBat(GL2 gl, Player player, float x, float y, float rotation, float scale) {
         gl.glPushMatrix();
@@ -228,31 +93,9 @@ class Renderer2 implements GLEventListener {
         gl.glRotatef(rotation, 0, 0, 1);
         gl.glScalef(scale / 2, player.paddleHeight, scale / 2);
 
-        // activating Player VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
+        gl.glBindVertexArray(vaoPlayer[0]);
         gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPlayer);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
+        gl.glBindVertexArray(0);
 
         gl.glPopMatrix();
     }
@@ -265,42 +108,15 @@ class Renderer2 implements GLEventListener {
         gl.glTranslatef(x, y, -1.2f);
         gl.glRotatef(rotation, 0, 1, 0);
         gl.glScalef(scale, scale, scale);
-        gl.glColor3f(1.0f, 1.0f, 1.0f);
-        gl.glLineWidth(1.0f);
 
-        // activating PlayingField VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
-        int stride = (3+4+2+3)*Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3*Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // texture
-        offsetVBO = (3 + 4) * Buffers.SIZEOF_FLOAT;
-        gl.glTexCoordPointer(2, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3+4+2)*Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
+        gl.glBindVertexArray(vaoPlayingField[0]);
         gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPlayingField);
+        gl.glBindVertexArray(0);
 
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
-        gl.glDisable(GL2.GL_TEXTURE_2D);
         gl.glPopMatrix();
+        gl.glDisable(GL2.GL_TEXTURE_2D);
     }
+
 
     public void drawPowerUp(GL2 gl, PowerUp powerUp, float scale) {
         if (!powerUp.active) return;
@@ -314,42 +130,14 @@ class Renderer2 implements GLEventListener {
         gl.glTranslatef(powerUp.posX, powerUp.posY, -2.0f);
         gl.glScalef(scale, scale, scale);
 
-        // activating PowerUp VBO
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
-        int stride = (3 + 4 + 2 + 3) * Buffers.SIZEOF_FLOAT;
-        int offsetVBO = 0;
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        offsetVBO = 0 + 3 * Buffers.SIZEOF_FLOAT;
-        gl.glColorPointer(4, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // texture
-        offsetVBO = (3 + 4) * Buffers.SIZEOF_FLOAT;
-        gl.glTexCoordPointer(2, GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
-
-        // normals
-        offsetVBO = 0 + (3 + 4 + 2) * Buffers.SIZEOF_FLOAT;
-        gl.glNormalPointer(GL2.GL_FLOAT, stride, offsetVBO);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-        // render data
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPowerUp);
-
-        gl.glDisableClientState(GL2.GL_VERTEX_ARRAY);
-        gl.glDisableClientState(GL2.GL_COLOR_ARRAY);
-        gl.glDisableClientState(GL2.GL_NORMAL_ARRAY);
-        gl.glDisable(GL2.GL_TEXTURE_2D);
+        gl.glBindVertexArray(vaoPowerUp[0]);
+        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, powerUpVertexCount);
+        gl.glBindVertexArray(0);
 
         gl.glPopMatrix();
+
+        gl.glDisable(GL2.GL_TEXTURE_2D);
     }
-
-
 
     @Override
     public void init(GLAutoDrawable d) {
@@ -390,6 +178,31 @@ class Renderer2 implements GLEventListener {
         gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdBall[0]);
         gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn1.capacity() * Buffers.SIZEOF_FLOAT, dataIn1, GL2.GL_STATIC_DRAW);
 
+        // VAO for ball
+        gl.glGenVertexArrays(1, vaoBall, 0);
+        gl.glBindVertexArray(vaoBall[0]);
+
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdBall[0]);
+
+        // position
+        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
+        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+        // color
+        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+        // texture
+        gl.glTexCoordPointer(2, GL2.GL_FLOAT, STRIDE, (3+4) * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
+
+        // normal
+        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3+4+2) * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+        gl.glBindVertexArray(0);
+
+
         // generating Player vertex VBO
         vertNoPlayer = playerVertexData.length / perVertexFloats;
         FloatBuffer dataIn2 = Buffers.newDirectFloatBuffer(playerVertexData.length);
@@ -400,6 +213,23 @@ class Renderer2 implements GLEventListener {
         gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
         gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn2.capacity() *Buffers.SIZEOF_FLOAT, dataIn2, GL2.GL_STATIC_DRAW);
 
+        // VAO for player
+        gl.glGenVertexArrays(1, vaoPlayer, 0);
+        gl.glBindVertexArray(vaoPlayer[0]);
+
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
+
+        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
+        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3+4+2) * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+        gl.glBindVertexArray(0);
+
         // generating PlayingField vertex VBO
         vertNoPlayingField = playingFieldVertexData.length / perVertexFloats;
         FloatBuffer dataIn3 = Buffers.newDirectFloatBuffer(playingFieldVertexData.length);
@@ -409,6 +239,26 @@ class Renderer2 implements GLEventListener {
         gl.glGenBuffers(1, vertBufIdPlayingField, 0);
         gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
         gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn3.capacity() *Buffers.SIZEOF_FLOAT, dataIn3, GL2.GL_STATIC_DRAW);
+
+        // VAO for playing field
+        gl.glGenVertexArrays(1, vaoPlayingField, 0);
+        gl.glBindVertexArray(vaoPlayingField[0]);
+
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
+
+        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
+        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+        gl.glTexCoordPointer(2, GL2.GL_FLOAT, STRIDE, (3 + 4) * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
+
+        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3+4+2) * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+        gl.glBindVertexArray(0);
 
         // generating ScoreZero vertex VBO
         vertNo_0 = scoreZeroVertexData.length / perVertexFloats;
@@ -450,6 +300,41 @@ class Renderer2 implements GLEventListener {
         gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_3[0]);
         gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn7.capacity() *Buffers.SIZEOF_FLOAT, dataIn7, GL2.GL_STATIC_DRAW);
 
+        int[][] digitVBOs = {
+                vertBufId_0,
+                vertBufId_1,
+                vertBufId_2,
+                vertBufId_3
+        };
+
+        for (int i = 0; i < 4; i++) {
+            gl.glGenVertexArrays(1, vaoDigits, i);
+            gl.glBindVertexArray(vaoDigits[i]);
+
+            gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, digitVBOs[i][0]);
+
+            // position
+            gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
+            gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+            // color
+            gl.glColorPointer(
+                    4, GL2.GL_FLOAT, STRIDE,
+                    3 * Buffers.SIZEOF_FLOAT
+            );
+            gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+            // normal
+            gl.glNormalPointer(
+                    GL2.GL_FLOAT, STRIDE,
+                    (3 + 4 + 2) * Buffers.SIZEOF_FLOAT
+            );
+            gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+            // unbind VAO after setup
+            gl.glBindVertexArray(0);
+        }
+
         // generating PowerUp vertex VBO
         vertNoPowerUp = powerUpVertexData.length / perVertexFloats;
         FloatBuffer dataIn8 = Buffers.newDirectFloatBuffer(powerUpVertexData.length);
@@ -459,6 +344,32 @@ class Renderer2 implements GLEventListener {
         gl.glGenBuffers(1, vertBufIdPowerUp, 0);
         gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
         gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn8.capacity() *Buffers.SIZEOF_FLOAT, dataIn8, GL2.GL_STATIC_DRAW);
+
+        gl.glGenVertexArrays(1, vaoPowerUp, 0);
+        gl.glBindVertexArray(vaoPowerUp[0]);
+
+        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
+
+        // position
+        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
+        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+
+        // color
+        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
+
+        // texture
+        gl.glTexCoordPointer(2, GL2.GL_FLOAT, STRIDE, (3 + 4) * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
+
+        // normals
+        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3 + 4 + 2) * Buffers.SIZEOF_FLOAT);
+        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+
+        gl.glBindVertexArray(0);
+
+        powerUpVertexCount = vertNoPowerUp;
+
 
     }
 
@@ -496,31 +407,31 @@ class Renderer2 implements GLEventListener {
 
         switch (game.scoreP1) {
             case 0:
-                drawScoreZero(gl, -0.1f, 1.0f, 0.0f);
+                drawDigit(gl, -0.1f, 1.0f, 0, vertNo_0);
                 break;
             case 1:
-                drawScoreOne(gl, -0.1f, 1.0f, 0.0f);
+                drawDigit(gl, -0.1f, 1.0f, 1, vertNo_1);
                 break;
             case 2:
-                drawScoreTwo(gl, -0.1f, 1.0f, 0.0f);
+                drawDigit(gl, -0.1f, 1.0f, 2, vertNo_2);
                 break;
             case 3:
-                drawScoreThree(gl, -0.1f, 1.0f, 0.0f);
+                drawDigit(gl, -0.1f, 1.0f, 3, vertNo_3);
                 break;
         }
 
         switch (game.scoreP2) {
             case 0:
-                drawScoreZero(gl, 0.1f, 1.0f, 0.0f);
+                drawDigit(gl, 0.1f, 1.0f, 0, vertNo_0);
                 break;
             case 1:
-                drawScoreOne(gl, 0.1f, 1.0f, 0.0f);
+                drawDigit(gl, 0.1f, 1.0f, 1, vertNo_1);
                 break;
             case 2:
-                drawScoreTwo(gl, 0.1f, 1.0f, 0.0f);
+                drawDigit(gl, 0.1f, 1.0f, 2, vertNo_2);
                 break;
             case 3:
-                drawScoreThree(gl, 0.1f, 1.0f, 0.0f);
+                drawDigit(gl, 0.1f, 1.0f, 3, vertNo_3);
                 break;
         }
         game.step();
