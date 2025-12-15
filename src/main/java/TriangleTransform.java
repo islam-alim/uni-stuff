@@ -8,7 +8,6 @@ import javax.swing.*;
 import com.jogamp.common.nio.Buffers;
 import com.jogamp.opengl.*;
 import com.jogamp.opengl.awt.GLCanvas;
-import com.jogamp.opengl.glu.GLU;
 import com.jogamp.opengl.util.FPSAnimator;
 
 import java.awt.event.KeyAdapter;
@@ -18,10 +17,11 @@ import java.io.*;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
+import java.nio.IntBuffer;
+import com.jogamp.math.Matrix4f;
 
 class Renderer2 implements GLEventListener {
 
-    private GLU glu = new GLU();
     Game game;
 
     public float t = 0.0f;
@@ -56,94 +56,83 @@ class Renderer2 implements GLEventListener {
     private int[] vaoDigits = new int[4]; // 0,1,2,3
     private static final int STRIDE = (3+4+2+3) * Buffers.SIZEOF_FLOAT;
 
+    // Shaders
+    private int progID = 0;
+    private int vertID = 0;
+    private int fragID = 0;
+    private int vertexLoc = 0;
+    private int colorLoc = 0;
+    private int texCoordLoc = 0;
+    private int normalLoc = 0;
+    private int projectionLoc = 0;
+    private int modelviewLoc = 0;
+    private int texLoc = 0;
+    private int shadeLoc = 0;
 
-    public void drawDigit(GL2 gl, float x, float y, int digit, int vertexCount) {
-        gl.glPushMatrix();
 
-        gl.glTranslatef(x, y, -2.0f);
-        gl.glRotatef(0, 0, 0, 1);
-        gl.glScalef(0.25f, 0.25f, 0.25f);
+    public void drawDigit(GL3 gl, float x, float y, int digit, int vertexCount) {
 
+        uploadModel(gl, x, y, -2.0f, 0.0f, 0.25f, 0.25f, 0.25f);
+        gl.glUniform1i(shadeLoc, 0);
         gl.glBindVertexArray(vaoDigits[digit]);
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertexCount);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
         gl.glBindVertexArray(0);
-
-        gl.glPopMatrix();
     }
 
 
 
-    public void drawCube(GL2 gl, float x, float y, float rotation, float scale) {
-        gl.glPushMatrix();
-        gl.glTranslatef(x, y, -2.0f);
-        gl.glRotatef(rotation, 0, 0, 1);
-        gl.glScalef(scale, scale, scale);
 
+    public void drawBall(GL3 gl, float x, float y, float rotationDeg, float scale) {
+
+        uploadModel(gl, x, y, -2.0f, rotationDeg, scale, scale, scale);
+        gl.glUniform1i(shadeLoc, 0);
         gl.glBindVertexArray(vaoBall[0]);
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoBall);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoBall);
         gl.glBindVertexArray(0);
-
-        gl.glPopMatrix();
     }
 
+    public void drawBat(GL3 gl, Player player, float x, float y, float rotation, float scale) {
 
-    public void drawBat(GL2 gl, Player player, float x, float y, float rotation, float scale) {
-        gl.glPushMatrix();
-        gl.glTranslatef(x, y, -2.0f);
-        gl.glRotatef(rotation, 0, 0, 1);
-        gl.glScalef(scale / 2, player.paddleHeight, scale / 2);
-
+        uploadModel(gl, x, y, -2.0f, rotation, scale / 2.0f, player.paddleHeight, scale / 2.0f);
+        gl.glUniform1i(shadeLoc, 0);
         gl.glBindVertexArray(vaoPlayer[0]);
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPlayer);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayer);
         gl.glBindVertexArray(0);
-
-        gl.glPopMatrix();
     }
 
-    public void drawPlayingField(GL2 gl, float x, float y, float rotation, float scale) {
-        gl.glEnable(GL2.GL_TEXTURE_2D);
-        gl.glBindTexture(GL2.GL_TEXTURE_2D, courtTexID);
+    public void drawPlayingField(GL3 gl, float x, float y, float rotation, float scale) {
 
-        gl.glPushMatrix();
-        gl.glTranslatef(x, y, -1.2f);
-        gl.glRotatef(rotation, 0, 1, 0);
-        gl.glScalef(scale, scale, scale);
+        gl.glBindTexture(GL.GL_TEXTURE_2D, courtTexID);
+        gl.glUniform1i(shadeLoc, 1);
+        uploadModelYRotation(gl, x, y, -1.2f, rotation, scale, scale, scale);
 
         gl.glBindVertexArray(vaoPlayingField[0]);
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, vertNoPlayingField);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayingField);
         gl.glBindVertexArray(0);
-
-        gl.glPopMatrix();
-        gl.glDisable(GL2.GL_TEXTURE_2D);
     }
 
+    public void drawPowerUp(GL3 gl, PowerUp powerUp, float scale) {
 
-    public void drawPowerUp(GL2 gl, PowerUp powerUp, float scale) {
         if (!powerUp.active) return;
-
+        gl.glUniform1i(shadeLoc, 1);
         int tex = (powerUp.type == 1) ? powerUpFlashTex : powerUpGrowTex;
+        gl.glBindTexture(GL.GL_TEXTURE_2D, tex);
 
-        gl.glEnable(GL2.GL_TEXTURE_2D);
-        gl.glBindTexture(GL2.GL_TEXTURE_2D, tex);
-
-        gl.glPushMatrix();
-        gl.glTranslatef(powerUp.posX, powerUp.posY, -2.0f);
-        gl.glScalef(scale, scale, scale);
+        uploadModel(gl, powerUp.posX, powerUp.posY,-2.0f,0.0f, scale, scale, scale);
 
         gl.glBindVertexArray(vaoPowerUp[0]);
-        gl.glDrawArrays(GL2.GL_TRIANGLES, 0, powerUpVertexCount);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, powerUpVertexCount);
         gl.glBindVertexArray(0);
-
-        gl.glPopMatrix();
-
-        gl.glDisable(GL2.GL_TEXTURE_2D);
     }
+
 
     @Override
     public void init(GLAutoDrawable d) {
         game = new Game();
-        GL2 gl = d.getGL().getGL2();
+        GL3 gl = d.getGL().getGL3();
         gl.glEnable(GL.GL_DEPTH_TEST);
+
+        setupShaders(d);
 
         courtTexID = loadTexture(d, "interstellar.png");
         powerUpGrowTex = loadTexture(d, "powerup_icons_grow.png");
@@ -175,33 +164,17 @@ class Renderer2 implements GLEventListener {
         dataIn1.flip();
 
         gl.glGenBuffers(1, vertBufIdBall, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdBall[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn1.capacity() * Buffers.SIZEOF_FLOAT, dataIn1, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdBall[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn1.capacity() * Buffers.SIZEOF_FLOAT, dataIn1, GL3.GL_STATIC_DRAW);
 
         // VAO for ball
         gl.glGenVertexArrays(1, vaoBall, 0);
         gl.glBindVertexArray(vaoBall[0]);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdBall[0]);
 
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdBall[0]);
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // texture
-        gl.glTexCoordPointer(2, GL2.GL_FLOAT, STRIDE, (3+4) * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
-
-        // normal
-        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3+4+2) * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+        setupVAO(gl, vaoBall[0], vertBufIdBall[0], vertNoBall);
 
         gl.glBindVertexArray(0);
-
 
         // generating Player vertex VBO
         vertNoPlayer = playerVertexData.length / perVertexFloats;
@@ -210,23 +183,15 @@ class Renderer2 implements GLEventListener {
         dataIn2.flip();
 
         gl.glGenBuffers(1, vertBufIdPlayer, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn2.capacity() *Buffers.SIZEOF_FLOAT, dataIn2, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn2.capacity() *Buffers.SIZEOF_FLOAT, dataIn2, GL3.GL_STATIC_DRAW);
 
         // VAO for player
         gl.glGenVertexArrays(1, vaoPlayer, 0);
         gl.glBindVertexArray(vaoPlayer[0]);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
 
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
-
-        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3+4+2) * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+        setupVAO(gl, vaoPlayer[0], vertBufIdPlayer[0], vertNoPlayer);
 
         gl.glBindVertexArray(0);
 
@@ -237,26 +202,15 @@ class Renderer2 implements GLEventListener {
         dataIn3.flip();
 
         gl.glGenBuffers(1, vertBufIdPlayingField, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn3.capacity() *Buffers.SIZEOF_FLOAT, dataIn3, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn3.capacity() *Buffers.SIZEOF_FLOAT, dataIn3, GL3.GL_STATIC_DRAW);
 
         // VAO for playing field
         gl.glGenVertexArrays(1, vaoPlayingField, 0);
         gl.glBindVertexArray(vaoPlayingField[0]);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
 
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
-
-        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        gl.glTexCoordPointer(2, GL2.GL_FLOAT, STRIDE, (3 + 4) * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
-
-        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3+4+2) * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+        setupVAO(gl, vaoPlayingField[0], vertBufIdPlayingField[0], vertNoPlayingField);
 
         gl.glBindVertexArray(0);
 
@@ -267,8 +221,8 @@ class Renderer2 implements GLEventListener {
         dataIn4.flip();
 
         gl.glGenBuffers(1, vertBufId_0, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_0[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn4.capacity() *Buffers.SIZEOF_FLOAT, dataIn4, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufId_0[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn4.capacity() *Buffers.SIZEOF_FLOAT, dataIn4, GL3.GL_STATIC_DRAW);
 
         // generating ScoreOne vertex VBO
         vertNo_1 = scoreOneVertexData.length / perVertexFloats;
@@ -277,8 +231,8 @@ class Renderer2 implements GLEventListener {
         dataIn5.flip();
 
         gl.glGenBuffers(1, vertBufId_1, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_1[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn5.capacity() *Buffers.SIZEOF_FLOAT, dataIn5, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufId_1[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn5.capacity() *Buffers.SIZEOF_FLOAT, dataIn5, GL3.GL_STATIC_DRAW);
 
         // generating ScoreTwo vertex VBO
         vertNo_2 = scoreTwoVertexData.length / perVertexFloats;
@@ -287,8 +241,8 @@ class Renderer2 implements GLEventListener {
         dataIn6.flip();
 
         gl.glGenBuffers(1, vertBufId_2, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_2[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn6.capacity() *Buffers.SIZEOF_FLOAT, dataIn6, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufId_2[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn6.capacity() *Buffers.SIZEOF_FLOAT, dataIn6, GL3.GL_STATIC_DRAW);
 
         // generating ScoreThree vertex VBO
         vertNo_3 = scoreThreeVertexData.length / perVertexFloats;
@@ -297,8 +251,8 @@ class Renderer2 implements GLEventListener {
         dataIn7.flip();
 
         gl.glGenBuffers(1, vertBufId_3, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufId_3[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn7.capacity() *Buffers.SIZEOF_FLOAT, dataIn7, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufId_3[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn7.capacity() *Buffers.SIZEOF_FLOAT, dataIn7, GL3.GL_STATIC_DRAW);
 
         int[][] digitVBOs = {
                 vertBufId_0,
@@ -307,31 +261,16 @@ class Renderer2 implements GLEventListener {
                 vertBufId_3
         };
 
+        int[] digitVertCounts = { vertNo_0, vertNo_1, vertNo_2, vertNo_3 };
+
         for (int i = 0; i < 4; i++) {
             gl.glGenVertexArrays(1, vaoDigits, i);
             gl.glBindVertexArray(vaoDigits[i]);
 
-            gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, digitVBOs[i][0]);
+            gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, digitVBOs[i][0]);
 
-            // position
-            gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
-            gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
+            setupVAO(gl, vaoDigits[i], digitVBOs[i][0], digitVertCounts[i]);
 
-            // color
-            gl.glColorPointer(
-                    4, GL2.GL_FLOAT, STRIDE,
-                    3 * Buffers.SIZEOF_FLOAT
-            );
-            gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-            // normal
-            gl.glNormalPointer(
-                    GL2.GL_FLOAT, STRIDE,
-                    (3 + 4 + 2) * Buffers.SIZEOF_FLOAT
-            );
-            gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
-
-            // unbind VAO after setup
             gl.glBindVertexArray(0);
         }
 
@@ -342,63 +281,57 @@ class Renderer2 implements GLEventListener {
         dataIn8.flip();
 
         gl.glGenBuffers(1, vertBufIdPowerUp, 0);
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
-        gl.glBufferData(GL2.GL_ARRAY_BUFFER, (long) dataIn8.capacity() *Buffers.SIZEOF_FLOAT, dataIn8, GL2.GL_STATIC_DRAW);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
+        gl.glBufferData(GL3.GL_ARRAY_BUFFER, (long) dataIn8.capacity() *Buffers.SIZEOF_FLOAT, dataIn8, GL3.GL_STATIC_DRAW);
 
         gl.glGenVertexArrays(1, vaoPowerUp, 0);
         gl.glBindVertexArray(vaoPowerUp[0]);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
 
-        gl.glBindBuffer(GL2.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
-
-        // position
-        gl.glVertexPointer(3, GL2.GL_FLOAT, STRIDE, 0);
-        gl.glEnableClientState(GL2.GL_VERTEX_ARRAY);
-
-        // color
-        gl.glColorPointer(4, GL2.GL_FLOAT, STRIDE, 3 * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_COLOR_ARRAY);
-
-        // texture
-        gl.glTexCoordPointer(2, GL2.GL_FLOAT, STRIDE, (3 + 4) * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_TEXTURE_COORD_ARRAY);
-
-        // normals
-        gl.glNormalPointer(GL2.GL_FLOAT, STRIDE, (3 + 4 + 2) * Buffers.SIZEOF_FLOAT);
-        gl.glEnableClientState(GL2.GL_NORMAL_ARRAY);
+        setupVAO(gl, vaoPowerUp[0], vertBufIdPowerUp[0], vertNoPowerUp);
 
         gl.glBindVertexArray(0);
 
         powerUpVertexCount = vertNoPowerUp;
-
-
     }
 
     @Override
     public void reshape(GLAutoDrawable d, int x, int y, int width, int height) {
-        GL2 gl = d.getGL().getGL2();
-
+        GL3 gl = d.getGL().getGL3();
         gl.glViewport(0, 0, width, height);
 
-        gl.glMatrixMode(GL2.GL_PROJECTION);
-        gl.glLoadIdentity();
-
         float aspect = (float) width / (float) height;
-        glu.gluPerspective(60, aspect, 1.0f, 5.0f);
+
+        float[] proj = makePerspective(60.0f, aspect, 1.0f, 5.0f);
+
+        gl.glUseProgram(progID);
+        gl.glUniformMatrix4fv(projectionLoc, 1, false, proj, 0);
+        gl.glUseProgram(0);
     }
+
 
 
     @Override
     public void display (GLAutoDrawable d) {
+        GL3 gl = d.getGL().getGL3();
 
-        GL2 gl = d.getGL().getGL2();  // get the OpenGL 2 graphics context
-        gl.glMatrixMode(GL2.GL_MODELVIEW);
-        gl.glLoadIdentity();
         gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
+        gl.glUseProgram(progID);
 
-        drawCube(gl, game.ball.posx, game.ball.posy, game.ball.rotation, 0.15f);
+        float[] modelviewMatrix = new float[16];
+        for (int i = 0; i < 16; i++) modelviewMatrix[i] = 0f;
+        modelviewMatrix[0] = 1; modelviewMatrix[5] = 1; modelviewMatrix[10] = 1; modelviewMatrix[15] = 1;
+
+        gl.glUniformMatrix4fv(modelviewLoc, 1, false, modelviewMatrix, 0);
+
+        gl.glActiveTexture(GL3.GL_TEXTURE0);
+        gl.glUniform1i(texLoc, 0);
+
+        drawBall(gl, game.ball.posx, game.ball.posy, game.ball.rotation, 0.15f);
         drawBat(gl, game.player1, game.player1.posX, game.player1.posY, 270.0f, 1f);
         drawBat(gl, game.player2, game.player2.posX, game.player2.posY, 90.0f, 1f);
 
+        gl.glBindTexture(GL.GL_TEXTURE_2D, courtTexID);
         drawPlayingField(gl, 0.0f, 0.0f, t, 2.0f);
         float offset = 0.01f;
         t += offset;
@@ -435,8 +368,217 @@ class Renderer2 implements GLEventListener {
                 break;
         }
         game.step();
-
+        gl.glUseProgram(0);
     }
+
+    public void setupShaders(GLAutoDrawable d) {
+        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
+
+        vertID = gl.glCreateShader(GL3.GL_VERTEX_SHADER);
+        fragID = gl.glCreateShader(GL3.GL_FRAGMENT_SHADER);
+
+
+
+        String[] vs = new String[]{
+                """
+        #version 150
+    
+        in vec3 inputPosition;
+        in vec4 inputColor;
+        in vec2 inputTexCoord;
+        in vec3 inputNormal;
+
+        uniform mat4 projection;
+        uniform mat4 modelview;
+
+        out vec3 forFragColor;
+        out vec2 forFragTexCoord;
+
+        void main(){
+            forFragColor = inputColor.rgb;
+            forFragTexCoord = inputTexCoord;
+            gl_Position = projection * modelview * vec4(inputPosition, 1.0);
+        }
+        """
+        };
+
+        String[] fs = new String[]{
+                """
+        #version 150
+
+        in vec3 forFragColor;
+        in vec2 forFragTexCoord;
+        out vec4 outputColor;
+
+        uniform sampler2D myTexture;
+        uniform int shading;
+
+        void main() {
+            vec3 textureColor = vec3(texture(myTexture, forFragTexCoord));
+            if (shading == 1) {
+            outputColor = vec4(forFragColor * textureColor, 1.0);
+            } else {
+            outputColor = vec4(forFragColor, 1.0);
+            }
+        }
+        """
+        };
+
+
+        gl.glShaderSource(vertID, 1, vs, null, 0);
+        gl.glShaderSource(fragID, 1, fs, null, 0);
+
+        // compile the shader
+        gl.glCompileShader(vertID);
+        gl.glCompileShader(fragID);
+
+        // check for errors
+        printShaderInfoLog(d, vertID);
+        printShaderInfoLog(d, fragID);
+
+        // create program and attach shaders
+        progID = gl.glCreateProgram();
+        gl.glAttachShader(progID, vertID);
+        gl.glAttachShader(progID, fragID);
+
+        // "outColor" is a user-provided OUT variable
+        // of the fragment shader.
+        // Its output is bound to the first color buffer
+        // in the framebuffer
+        gl.glBindFragDataLocation(progID, 0, "outputColor");
+
+        // link the program
+        gl.glLinkProgram(progID);
+        // output error messages
+        printProgramInfoLog(d, progID);
+
+        // "inputPosition" and "inputColor" are user-provided
+        // IN variables of the vertex shader.
+        // Their locations are stored to be used later with
+        // glEnableVertexAttribArray()
+        vertexLoc = gl.glGetAttribLocation(progID, "inputPosition");
+        colorLoc = gl.glGetAttribLocation(progID, "inputColor");
+        texCoordLoc = gl.glGetAttribLocation(progID, "inputTexCoord");
+        normalLoc = gl.glGetAttribLocation(progID, "inputNormal");
+
+        // "projection" and "modelview" are user-provided
+        // UNIFORM variables of the vertex shader.
+        // Their locations are stored to be used later
+        projectionLoc = gl.glGetUniformLocation(progID, "projection");
+        modelviewLoc = gl.glGetUniformLocation(progID, "modelview");
+        texLoc = gl.glGetUniformLocation(progID, "myTexture");
+        shadeLoc = gl.glGetUniformLocation(progID, "shading");
+    }
+
+    private void printShaderInfoLog(GLAutoDrawable d, int obj) {
+        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
+        IntBuffer infoLogLengthBuf = IntBuffer.allocate(1);
+        int infoLogLength;
+        gl.glGetShaderiv(obj, GL3.GL_INFO_LOG_LENGTH, infoLogLengthBuf);
+        infoLogLength = infoLogLengthBuf.get(0);
+        if (infoLogLength > 0) {
+            ByteBuffer byteBuffer = ByteBuffer.allocate(infoLogLength);
+            gl.glGetShaderInfoLog(obj, infoLogLength, infoLogLengthBuf, byteBuffer);
+            for (byte b : byteBuffer.array()) {
+                System.err.print((char) b);
+            }
+        }
+    }
+
+
+    private void printProgramInfoLog(GLAutoDrawable d, int obj) {
+        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
+        IntBuffer infoLogLengthBuf = IntBuffer.allocate(1);
+        int infoLogLength;
+        gl.glGetProgramiv(obj, GL3.GL_INFO_LOG_LENGTH, infoLogLengthBuf);
+        infoLogLength = infoLogLengthBuf.get(0);
+        if (infoLogLength > 0) {
+            ByteBuffer byteBuffer = ByteBuffer.allocate(infoLogLength);
+            gl.glGetProgramInfoLog(obj, infoLogLength, infoLogLengthBuf, byteBuffer);
+            for (byte b : byteBuffer.array()) {
+                System.err.print((char) b);
+            }
+        }
+    }
+
+    private void setupVAO(GL3 gl, int vaoId, int vboId, int vertexCount) {
+        gl.glBindVertexArray(vaoId);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vboId);
+
+        if (vertexLoc >= 0) {
+            gl.glEnableVertexAttribArray(vertexLoc);
+            gl.glVertexAttribPointer(vertexLoc, 3, GL3.GL_FLOAT, false, STRIDE, 0);
+        }
+
+        long colorOffset = 3 * Buffers.SIZEOF_FLOAT;
+        if (colorLoc >= 0) {
+            gl.glEnableVertexAttribArray(colorLoc);
+            gl.glVertexAttribPointer(colorLoc, 4, GL3.GL_FLOAT, false, STRIDE, colorOffset);
+        }
+
+        long texOffset = (3 + 4) * Buffers.SIZEOF_FLOAT;
+        if (texCoordLoc >= 0) {
+            gl.glEnableVertexAttribArray(texCoordLoc);
+            gl.glVertexAttribPointer(texCoordLoc, 2, GL3.GL_FLOAT, false, STRIDE, texOffset);
+        }
+
+        long normalOffset = (3 + 4 + 2) * Buffers.SIZEOF_FLOAT;
+        if (normalLoc >= 0) {
+            gl.glEnableVertexAttribArray(normalLoc);
+            gl.glVertexAttribPointer(normalLoc, 3, GL3.GL_FLOAT, false, STRIDE, normalOffset);
+        }
+
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
+        gl.glBindVertexArray(0);
+    }
+
+    private float[] makePerspective(float fovyDeg, float aspect, float zNear, float zFar) {
+        float fovy = (float)Math.toRadians(fovyDeg);
+        float f = (float)(1.0 / Math.tan(fovy / 2.0));
+        float[] m = new float[16];
+        for (int i = 0; i < 16; i++) m[i] = 0;
+        m[0] = f / aspect;
+        m[5] = f;
+        m[10] = (zFar + zNear) / (zNear - zFar);
+        m[11] = -1f;
+        m[14] = (2f * zFar * zNear) / (zNear - zFar);
+        return m;
+    }
+
+    private void uploadModel(GL3 gl, float x, float y, float z, float rotationDeg, float sx, float sy, float sz) {
+
+        float[] m = new float[16];
+        Matrix4f modelview = new Matrix4f();
+
+        float r = (float) Math.toRadians(rotationDeg);
+        float c = (float) Math.cos(r);
+        float s = (float) Math.sin(r);
+
+        m[0]  = c * sx;   m[4]  = -s * sy;  m[8]  = 0;   m[12] = x;
+        m[1]  = s * sx;   m[5]  =  c * sy;  m[9]  = 0;   m[13] = y;
+        m[2]  = 0;        m[6]  = 0;        m[10] = sz;  m[14] = z;
+        m[3]  = 0;        m[7]  = 0;        m[11] = 0;   m[15] = 1;
+
+        gl.glUniformMatrix4fv(modelviewLoc, 1, false, m, 0);
+    }
+
+    private void uploadModelYRotation(GL3 gl, float x, float y, float z, float rotationDeg, float sx, float sy, float sz) {
+
+        float[] m = new float[16];
+
+        float r = (float) Math.toRadians(rotationDeg);
+        float c = (float) Math.cos(r);
+        float s = (float) Math.sin(r);
+
+        m[0]  = c * sx;  m[4]  = 0;  m[8]  = s * sz;   m[12] = x;
+        m[1]  = 0;       m[5]  = sy; m[9]  = 0;       m[13] = y;
+        m[2]  = -s * sx; m[6]  = 0;  m[10] = c * sz;  m[14] = z;
+        m[3]  = 0;       m[7]  = 0;  m[11] = 0;      m[15] = 1;
+
+
+        gl.glUniformMatrix4fv(modelviewLoc, 1, false, m, 0);
+    }
+
 
     private float[] loadVertexData(String filename, int perVertexFloats) {
 
@@ -545,7 +687,6 @@ class Renderer2 implements GLEventListener {
 
 class MyGui2 extends JFrame {
 
-
     private Renderer2 renderer2;
 
     public void createGUI() {
@@ -619,8 +760,8 @@ class MyGui2 extends JFrame {
 class Game {
 
     public Ball ball = new Ball(0, 0, 0.6f, 0.2f);
-    public Player player1 = new Player(-0.9f, 0);
-    public Player player2 = new Player(0.9f, 0);
+    public Player player1 = new Player(-1.8f, 0);
+    public Player player2 = new Player(1.8f, 0);
 
     public PowerUp powerUp;
     public Player lastTouched = player1;
@@ -659,8 +800,6 @@ class Game {
                     (ball.oldPosX > player2.posX && ball.posx <= player2.posX))
                 lastTouched = player2;
 
-
-
             // power-up collision
             if (powerUp.isHit(ball)) {
                 powerUp.pickUp();
@@ -673,11 +812,11 @@ class Game {
             }
 
             // scoring
-            if (ball.posx >= 1.0f) {
+            if (ball.posx >= 2.0f) {
                 scoreP1++;
                 resetBall(-0.6f);
                 spawnPowerUpIfNeeded();
-            } else if (ball.posx <= -1.0f) {
+            } else if (ball.posx <= -2.0f) {
                 scoreP2++;
                 resetBall(0.6f);
                 spawnPowerUpIfNeeded();
