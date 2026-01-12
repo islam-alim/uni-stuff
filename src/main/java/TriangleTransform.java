@@ -25,6 +25,7 @@ class Renderer2 implements GLEventListener {
     Game game;
 
     public float t = 0.0f;
+    public int modeVal = 1; // shading mode
     int courtTexID = 0;
     int powerUpGrowTex;
     int powerUpFlashTex;
@@ -60,12 +61,17 @@ class Renderer2 implements GLEventListener {
     private int progID = 0;
     private int vertID = 0;
     private int fragID = 0;
+
+    // Attribute Locations
     private int vertexLoc = 0;
     private int colorLoc = 0;
     private int texCoordLoc = 0;
     private int normalLoc = 0;
+
+    // Uniform Locations
     private int projectionLoc = 0;
     private int modelviewLoc = 0;
+    private int normalMatrixLoc = 0;
     private int texLoc = 0;
     private int shadeLoc = 0;
 
@@ -309,6 +315,37 @@ class Renderer2 implements GLEventListener {
         gl.glUseProgram(0);
     }
 
+    private float[] inverseTranspose3x3(float[] m) {
+        float[] inv = new float[9];
+
+        // compute determinant
+        float det = m[0]*(m[4]*m[8]-m[5]*m[7])
+                - m[1]*(m[3]*m[8]-m[5]*m[6])
+                + m[2]*(m[3]*m[7]-m[4]*m[6]);
+        if (det == 0) return new float[]{1,0,0,0,1,0,0,0,1}; // fallback identity
+        float invDet = 1.0f / det;
+
+        // inverse
+        inv[0] = (m[4]*m[8]-m[5]*m[7])*invDet;
+        inv[1] = (m[2]*m[7]-m[1]*m[8])*invDet;
+        inv[2] = (m[1]*m[5]-m[2]*m[4])*invDet;
+        inv[3] = (m[5]*m[6]-m[3]*m[8])*invDet;
+        inv[4] = (m[0]*m[8]-m[2]*m[6])*invDet;
+        inv[5] = (m[2]*m[3]-m[0]*m[5])*invDet;
+        inv[6] = (m[3]*m[7]-m[4]*m[6])*invDet;
+        inv[7] = (m[1]*m[6]-m[0]*m[7])*invDet;
+        inv[8] = (m[0]*m[4]-m[1]*m[3])*invDet;
+
+        // transpose
+        float[] nt = new float[9];
+        nt[0] = inv[0]; nt[1] = inv[3]; nt[2] = inv[6];
+        nt[3] = inv[1]; nt[4] = inv[4]; nt[5] = inv[7];
+        nt[6] = inv[2]; nt[7] = inv[5]; nt[8] = inv[8];
+
+        return nt;
+    }
+
+
 
 
     @Override
@@ -377,50 +414,91 @@ class Renderer2 implements GLEventListener {
         vertID = gl.glCreateShader(GL3.GL_VERTEX_SHADER);
         fragID = gl.glCreateShader(GL3.GL_FRAGMENT_SHADER);
 
-
-
         String[] vs = new String[]{
                 """
         #version 150
-    
+        
         in vec3 inputPosition;
         in vec4 inputColor;
         in vec2 inputTexCoord;
         in vec3 inputNormal;
-
+        
         uniform mat4 projection;
         uniform mat4 modelview;
-
-        out vec3 forFragColor;
-        out vec2 forFragTexCoord;
-
-        void main(){
-            forFragColor = inputColor.rgb;
-            forFragTexCoord = inputTexCoord;
-            gl_Position = projection * modelview * vec4(inputPosition, 1.0);
+        uniform mat3 normalMatrix;
+        
+        out vec3 vColor;
+        out vec2 vTexCoord;
+        out vec3 vNormal;
+        out vec3 vViewPos;
+        
+        void main()
+        {
+            vColor = inputColor.rgb;
+            vTexCoord = inputTexCoord;
+            vNormal = normalMatrix * inputNormal;
+        
+            vec4 viewPos4 = modelview * vec4(inputPosition, 1.0);
+            vViewPos = viewPos4.xyz;
+        
+            gl_Position = projection * viewPos4;
         }
+        
         """
         };
 
         String[] fs = new String[]{
                 """
         #version 150
-
-        in vec3 forFragColor;
-        in vec2 forFragTexCoord;
-        out vec4 outputColor;
-
-        uniform sampler2D myTexture;
-        uniform int shading;
-
-        void main() {
-            vec3 textureColor = vec3(texture(myTexture, forFragTexCoord));
-            if (shading == 1) {
-            outputColor = vec4(forFragColor * textureColor, 1.0);
-            } else {
-            outputColor = vec4(forFragColor, 1.0);
-            }
-        }
+         
+         in vec3 vColor;
+         in vec2 vTexCoord;
+         in vec3 vNormal;
+         in vec3 vViewPos;
+         
+         out vec4 outputColor;
+         
+         uniform sampler2D myTexture;
+         uniform int shading;
+         
+         const vec3 lightDir = normalize(vec3(0.0, 0.0, 1.0));
+         
+         const vec3 ambientCoeff  = vec3(0.2);
+         const vec3 specularCoeff = vec3(0.5);
+         const float shininess = 20.0;
+         
+         
+         void main() {
+         
+             vec3 baseColor = vColor;
+             if (shading == 1) {
+                 baseColor *= texture(myTexture, vTexCoord).rgb;
+             }
+         
+             vec3 N = normalize(vNormal);
+             vec3 V = normalize(vViewPos);
+             vec3 L = lightDir;
+         
+             // Ambient
+             vec3 color = ambientCoeff * baseColor;
+         
+             // Diffuse
+             float diff = max(dot(N, L), 0.0);
+             color += diff * baseColor;
+         
+             // Specular (Phong)
+             if (diff > 0.0) {
+                 vec3 R = reflect(-L, N);
+                 float spec = pow(max(dot(R, V), 0.0), shininess);
+                 color += spec * specularCoeff;
+             }
+         
+             // Gamma correction
+             color = pow(color, vec3(1.0 / 2.2));
+         
+             outputColor = vec4(color, 1.0);
+         }
+         
         """
         };
 
@@ -466,6 +544,7 @@ class Renderer2 implements GLEventListener {
         // Their locations are stored to be used later
         projectionLoc = gl.glGetUniformLocation(progID, "projection");
         modelviewLoc = gl.glGetUniformLocation(progID, "modelview");
+        normalMatrixLoc =  gl.glGetUniformLocation(progID, "normalMatrix");
         texLoc = gl.glGetUniformLocation(progID, "myTexture");
         shadeLoc = gl.glGetUniformLocation(progID, "shading");
     }
@@ -548,7 +627,6 @@ class Renderer2 implements GLEventListener {
     private void uploadModel(GL3 gl, float x, float y, float z, float rotationDeg, float sx, float sy, float sz) {
 
         float[] m = new float[16];
-        Matrix4f modelview = new Matrix4f();
 
         float r = (float) Math.toRadians(rotationDeg);
         float c = (float) Math.cos(r);
@@ -559,6 +637,14 @@ class Renderer2 implements GLEventListener {
         m[2]  = 0;        m[6]  = 0;        m[10] = sz;  m[14] = z;
         m[3]  = 0;        m[7]  = 0;        m[11] = 0;   m[15] = 1;
 
+        float[] mv3 = new float[9];
+        mv3[0] = m[0]; mv3[1] = m[4]; mv3[2] = m[8];
+        mv3[3] = m[1]; mv3[4] = m[5]; mv3[5] = m[9];
+        mv3[6] = m[2]; mv3[7] = m[6]; mv3[8] = m[10];
+
+        float[] normalMat = inverseTranspose3x3(mv3);
+
+        gl.glUniformMatrix3fv(normalMatrixLoc, 1, false, normalMat, 0);
         gl.glUniformMatrix4fv(modelviewLoc, 1, false, m, 0);
     }
 
@@ -575,7 +661,14 @@ class Renderer2 implements GLEventListener {
         m[2]  = -s * sx; m[6]  = 0;  m[10] = c * sz;  m[14] = z;
         m[3]  = 0;       m[7]  = 0;  m[11] = 0;      m[15] = 1;
 
+        float[] mv3 = new float[9];
+        mv3[0] = m[0]; mv3[1] = m[4]; mv3[2] = m[8];
+        mv3[3] = m[1]; mv3[4] = m[5]; mv3[5] = m[9];
+        mv3[6] = m[2]; mv3[7] = m[6]; mv3[8] = m[10];
 
+        float[] normalMat = inverseTranspose3x3(mv3);
+
+        gl.glUniformMatrix3fv(normalMatrixLoc, 1, false, normalMat, 0);
         gl.glUniformMatrix4fv(modelviewLoc, 1, false, m, 0);
     }
 
@@ -616,7 +709,7 @@ class Renderer2 implements GLEventListener {
 
     // returns a valid textureID on success, otherwise 0
     private int loadTexture(GLAutoDrawable d, String filename) {
-        GL2 gl = d.getGL().getGL2(); // get the OpenGL 2 graphics context
+        GL3 gl = d.getGL().getGL3(); // get the OpenGL 2 graphics context
 
         int width;
         int height;
@@ -655,24 +748,24 @@ class Renderer2 implements GLEventListener {
             buffer.rewind();
 
             // data is aligned in byte order
-            gl.glPixelStorei(GL2.GL_UNPACK_ALIGNMENT, 1);
+            gl.glPixelStorei(GL3.GL_UNPACK_ALIGNMENT, 1);
 
             //request textureID
             final int[] textureID = new int[1];
             gl.glGenTextures( 1, textureID, 0);
 
             // bind texture
-            gl.glBindTexture(GL2.GL_TEXTURE_2D, textureID[0]);
+            gl.glBindTexture(GL3.GL_TEXTURE_2D, textureID[0]);
 
             //define how to filter the texture (important but ignore for now)
-            gl.glTexParameteri (GL2.GL_TEXTURE_2D, GL2.GL_TEXTURE_MAG_FILTER, GL2.GL_LINEAR);
-            gl.glTexParameteri (GL2.GL_TEXTURE_2D, GL2.GL_TEXTURE_MIN_FILTER, GL2.GL_LINEAR);
+            gl.glTexParameteri (GL3.GL_TEXTURE_2D, GL3.GL_TEXTURE_MAG_FILTER, GL3.GL_LINEAR);
+            gl.glTexParameteri (GL3.GL_TEXTURE_2D, GL3.GL_TEXTURE_MIN_FILTER, GL3.GL_LINEAR);
 
             //texture colors should replace the original color values
-            gl.glTexEnvf(GL2.GL_TEXTURE_ENV, GL2.GL_TEXTURE_ENV_MODE, GL2.GL_REPLACE); //GL_MODULATE
+            //gl.glTexEnvf(GL3.GL_TEXTURE_ENV, GL3.GL_TEXTURE_ENV_MODE, GL3.GL_REPLACE); //GL_MODULATE
 
             // specify the 2D texture map
-            gl.glTexImage2D(GL2.GL_TEXTURE_2D, level, GL2.GL_RGB, width, height, border, GL2.GL_RGBA, GL2.GL_UNSIGNED_BYTE, buffer);
+            gl.glTexImage2D(GL3.GL_TEXTURE_2D, level, GL3.GL_RGB, width, height, border, GL3.GL_RGBA, GL3.GL_UNSIGNED_BYTE, buffer);
 
             return textureID[0];
         } catch( FileNotFoundException e) {
