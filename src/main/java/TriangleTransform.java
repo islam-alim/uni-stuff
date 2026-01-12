@@ -18,14 +18,13 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.FloatBuffer;
 import java.nio.IntBuffer;
-import com.jogamp.math.Matrix4f;
 
 class Renderer2 implements GLEventListener {
 
     Game game;
 
     public float t = 0.0f;
-    public int modeVal = 1; // shading mode
+    public int modeVal = 0; // shading mode
     int courtTexID = 0;
     int powerUpGrowTex;
     int powerUpFlashTex;
@@ -74,19 +73,16 @@ class Renderer2 implements GLEventListener {
     private int normalMatrixLoc = 0;
     private int texLoc = 0;
     private int shadeLoc = 0;
-
+    private int lightDirLoc = 0;
+    private int modeLoc = 0;
 
     public void drawDigit(GL3 gl, float x, float y, int digit, int vertexCount) {
-
         uploadModel(gl, x, y, -2.0f, 0.0f, 0.25f, 0.25f, 0.25f);
         gl.glUniform1i(shadeLoc, 0);
         gl.glBindVertexArray(vaoDigits[digit]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
         gl.glBindVertexArray(0);
     }
-
-
-
 
     public void drawBall(GL3 gl, float x, float y, float rotationDeg, float scale) {
 
@@ -405,7 +401,27 @@ class Renderer2 implements GLEventListener {
                 break;
         }
         game.step();
+
         gl.glUseProgram(0);
+        gl.glUseProgram(progID);
+        gl.glUniform1i(modeLoc, MyGui2.renderer2.modeVal);
+
+        switch (MyGui2.renderer2.modeVal) {
+            case 1:
+                gl.glUniform3f(lightDirLoc, 0.0f, -1.0f, 0.0f);
+                break;
+            case 2:
+                gl.glUniform3f(lightDirLoc, 0.0f, 1.0f, 0.0f);
+                break;
+            case 3:
+                gl.glUniform3f(lightDirLoc, -1.0f, -1.0f, 0.0f);
+                break;
+            case 4:
+                gl.glUniform3f(lightDirLoc, - game.ball.posx, - game.ball.posy, 0.0f);
+                break;
+        }
+
+
     }
 
     public void setupShaders(GLAutoDrawable d) {
@@ -437,10 +453,8 @@ class Renderer2 implements GLEventListener {
             vColor = inputColor.rgb;
             vTexCoord = inputTexCoord;
             vNormal = normalMatrix * inputNormal;
-        
             vec4 viewPos4 = modelview * vec4(inputPosition, 1.0);
             vViewPos = viewPos4.xyz;
-        
             gl_Position = projection * viewPos4;
         }
         
@@ -449,8 +463,8 @@ class Renderer2 implements GLEventListener {
 
         String[] fs = new String[]{
                 """
-        #version 150
-         
+         #version 150
+        
          in vec3 vColor;
          in vec2 vTexCoord;
          in vec3 vNormal;
@@ -460,15 +474,17 @@ class Renderer2 implements GLEventListener {
          
          uniform sampler2D myTexture;
          uniform int shading;
-         
-         const vec3 lightDir = normalize(vec3(0.0, 0.0, 1.0));
+         uniform vec3 lightDir;
+         uniform int mode;
          
          const vec3 ambientCoeff  = vec3(0.2);
-         const vec3 specularCoeff = vec3(0.5);
-         const float shininess = 20.0;
+         const vec3 specularCoeff = vec3(2.0);
+         const float n = 32.0;
          
          
          void main() {
+         
+        
          
              vec3 baseColor = vColor;
              if (shading == 1) {
@@ -477,20 +493,20 @@ class Renderer2 implements GLEventListener {
          
              vec3 N = normalize(vNormal);
              vec3 V = normalize(vViewPos);
-             vec3 L = lightDir;
+             vec3 L = normalize(lightDir);
          
              // Ambient
              vec3 color = ambientCoeff * baseColor;
          
              // Diffuse
-             float diff = max(dot(N, L), 0.0);
-             color += diff * baseColor;
+             float diffuse = max(dot(N, L), 0.0);
+             color += diffuse * baseColor;
          
-             // Specular (Phong)
-             if (diff > 0.0) {
+             // Specular
+             if (diffuse > 0.0) {
                  vec3 R = reflect(-L, N);
-                 float spec = pow(max(dot(R, V), 0.0), shininess);
-                 color += spec * specularCoeff;
+                 float specular = pow(max(dot(R, V), 0.0), n);
+                 color += specular * specularCoeff;
              }
          
              // Gamma correction
@@ -547,6 +563,8 @@ class Renderer2 implements GLEventListener {
         normalMatrixLoc =  gl.glGetUniformLocation(progID, "normalMatrix");
         texLoc = gl.glGetUniformLocation(progID, "myTexture");
         shadeLoc = gl.glGetUniformLocation(progID, "shading");
+        lightDirLoc = gl.glGetUniformLocation(progID, "lightDir");
+        modeLoc = gl.glGetUniformLocation(progID, "mode");
     }
 
     private void printShaderInfoLog(GLAutoDrawable d, int obj) {
@@ -780,7 +798,7 @@ class Renderer2 implements GLEventListener {
 
 class MyGui2 extends JFrame {
 
-    private Renderer2 renderer2;
+    public static Renderer2 renderer2;
 
     public void createGUI() {
 
@@ -845,6 +863,18 @@ class MyGui2 extends JFrame {
 
         setVisible(true);
         ani.start();
+
+        canvas.addKeyListener(new KeyAdapter() {
+            public void keyPressed(KeyEvent event) {
+                switch (event.getKeyCode()) {
+                    case '1': renderer2.modeVal = 1; break;
+                    case '2': renderer2.modeVal = 2; break;
+                    case '3': renderer2.modeVal = 3; break;
+                    case '4': renderer2.modeVal = 4; break;
+                }
+            }
+        });
+
 
     }
 
