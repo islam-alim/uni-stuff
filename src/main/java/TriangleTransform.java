@@ -342,8 +342,6 @@ class Renderer2 implements GLEventListener {
     }
 
 
-
-
     @Override
     public void display (GLAutoDrawable d) {
         GL3 gl = d.getGL().getGL3();
@@ -417,7 +415,7 @@ class Renderer2 implements GLEventListener {
                 gl.glUniform3f(lightDirLoc, -1.0f, -1.0f, 0.0f);
                 break;
             case 4:
-                gl.glUniform3f(lightDirLoc, - game.ball.posx, - game.ball.posy, 0.0f);
+                gl.glUniform3f(lightDirLoc, - game.ball.posx, - game.ball.posy, 1.0f);
                 break;
         }
 
@@ -479,7 +477,7 @@ class Renderer2 implements GLEventListener {
          
          const vec3 ambientCoeff  = vec3(0.2);
          const vec3 specularCoeff = vec3(2.0);
-         const float n = 32.0;
+         const float n = 150.0;
          
          
          void main() {
