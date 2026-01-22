@@ -319,7 +319,7 @@ class Renderer2 implements GLEventListener {
         float det = m[0]*(m[4]*m[8]-m[5]*m[7])
                 - m[1]*(m[3]*m[8]-m[5]*m[6])
                 + m[2]*(m[3]*m[7]-m[4]*m[6]);
-        if (det == 0) return new float[]{1,0,0,0,1,0,0,0,1}; // fallback identity
+        if (det == 0) return new float[]{1, 0, 0, 0, 1, 0, 0, 0, 1}; // fallback identity
         float invDet = 1.0f / det;
 
         // inverse
@@ -363,7 +363,7 @@ class Renderer2 implements GLEventListener {
                 gl.glUniform3f(lightDirLoc, -1.0f, -1.0f, 0.0f);
                 break;
             case 4:
-                gl.glUniform3f(lightDirLoc, - game.ball.posx, - game.ball.posy, 1.0f);
+                gl.glUniform3f(lightDirLoc, -game.ball.posx, -game.ball.posy, 1.0f);
                 break;
             case 5:
                 gl.glUniform1f(metallicLoc, 0.0f);
@@ -579,12 +579,10 @@ class Renderer2 implements GLEventListener {
           
               vec3 baseColor = vColor;
               
-              if (shading == 1) {
-                               baseColor *= texture(myTexture, vTexCoord).rgb;
-                           }
+              if (shading == 1) { baseColor *= texture(myTexture, vTexCoord).rgb; }
               
-              vec3 L = normalize(-lightDir);
-              vec3 V = normalize(-vViewPos);
+              vec3 L = normalize(lightDir);
+              vec3 V = normalize(vViewPos);
               vec3 N = normalize(vNormal);
               
               float r = max(roughness, 0.04);
@@ -610,7 +608,6 @@ class Renderer2 implements GLEventListener {
          
         """
         };
-
 
         gl.glShaderSource(vertID, 1, vs, null, 0);
         gl.glShaderSource(fragID, 1, fs, null, 0);
