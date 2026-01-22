@@ -75,6 +75,8 @@ class Renderer2 implements GLEventListener {
     private int shadeLoc = 0;
     private int lightDirLoc = 0;
     private int modeLoc = 0;
+    private int metallicLoc = 0;
+    private int roughnessLoc = 0;
 
     public void drawDigit(GL3 gl, float x, float y, int digit, int vertexCount) {
         uploadModel(gl, x, y, -2.0f, 0.0f, 0.25f, 0.25f, 0.25f);
@@ -85,7 +87,6 @@ class Renderer2 implements GLEventListener {
     }
 
     public void drawBall(GL3 gl, float x, float y, float rotationDeg, float scale) {
-
         uploadModel(gl, x, y, -2.0f, rotationDeg, scale, scale, scale);
         gl.glUniform1i(shadeLoc, 0);
         gl.glBindVertexArray(vaoBall[0]);
@@ -347,7 +348,36 @@ class Renderer2 implements GLEventListener {
         GL3 gl = d.getGL().getGL3();
 
         gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
+
         gl.glUseProgram(progID);
+        gl.glUniform1i(modeLoc, MyGui2.renderer2.modeVal);
+
+        switch (MyGui2.renderer2.modeVal) {
+            case 1:
+                gl.glUniform3f(lightDirLoc, 0.0f, -1.0f, 0.0f);
+                break;
+            case 2:
+                gl.glUniform3f(lightDirLoc, 0.0f, 1.0f, 0.0f);
+                break;
+            case 3:
+                gl.glUniform3f(lightDirLoc, -1.0f, -1.0f, 0.0f);
+                break;
+            case 4:
+                gl.glUniform3f(lightDirLoc, - game.ball.posx, - game.ball.posy, 1.0f);
+                break;
+            case 5:
+                gl.glUniform1f(metallicLoc, 0.0f);
+                break;
+            case 6:
+                gl.glUniform1f(metallicLoc, 1.0f);
+                break;
+            case 7:
+                gl.glUniform1f(roughnessLoc, 0.1f);
+                break;
+            case 8:
+                gl.glUniform1f(roughnessLoc, 0.2f);
+                break;
+        }
 
         float[] modelviewMatrix = new float[16];
         for (int i = 0; i < 16; i++) modelviewMatrix[i] = 0f;
@@ -357,6 +387,14 @@ class Renderer2 implements GLEventListener {
 
         gl.glActiveTexture(GL3.GL_TEXTURE0);
         gl.glUniform1i(texLoc, 0);
+
+        float[] identityNormal = {
+                1,0,0,
+                0,1,0,
+                0,0,1
+        };
+
+        gl.glUniformMatrix3fv(normalMatrixLoc, 1, false, identityNormal, 0);
 
         drawBall(gl, game.ball.posx, game.ball.posy, game.ball.rotation, 0.15f);
         drawBat(gl, game.player1, game.player1.posX, game.player1.posY, 270.0f, 1f);
@@ -399,27 +437,6 @@ class Renderer2 implements GLEventListener {
                 break;
         }
         game.step();
-
-        gl.glUseProgram(0);
-        gl.glUseProgram(progID);
-        gl.glUniform1i(modeLoc, MyGui2.renderer2.modeVal);
-
-        switch (MyGui2.renderer2.modeVal) {
-            case 1:
-                gl.glUniform3f(lightDirLoc, 0.0f, -1.0f, 0.0f);
-                break;
-            case 2:
-                gl.glUniform3f(lightDirLoc, 0.0f, 1.0f, 0.0f);
-                break;
-            case 3:
-                gl.glUniform3f(lightDirLoc, -1.0f, -1.0f, 0.0f);
-                break;
-            case 4:
-                gl.glUniform3f(lightDirLoc, - game.ball.posx, - game.ball.posy, 1.0f);
-                break;
-        }
-
-
     }
 
     public void setupShaders(GLAutoDrawable d) {
@@ -475,43 +492,121 @@ class Renderer2 implements GLEventListener {
          uniform vec3 lightDir;
          uniform int mode;
          
-         const vec3 ambientCoeff  = vec3(0.2);
-         const vec3 specularCoeff = vec3(2.0);
-         const float n = 150.0;
+         uniform float metallic;
+         uniform float roughness;
+         
+         const vec4 uLightColor = vec4(1.0, 1.0, 1.0, 1.0);
+         const float uIrradiPerp = 5.0;
          
          
-         void main() {
+         #define RECIPROCAL_PI 0.3183098861837907
          
-        
-         
-             vec3 baseColor = vColor;
-             if (shading == 1) {
-                 baseColor *= texture(myTexture, vTexCoord).rgb;
-             }
-         
-             vec3 N = normalize(vNormal);
-             vec3 V = normalize(vViewPos);
-             vec3 L = normalize(lightDir);
-         
-             // Ambient
-             vec3 color = ambientCoeff * baseColor;
-         
-             // Diffuse
-             float diffuse = max(dot(N, L), 0.0);
-             color += diffuse * baseColor;
-         
-             // Specular
-             if (diffuse > 0.0) {
-                 vec3 R = reflect(-L, N);
-                 float specular = pow(max(dot(R, V), 0.0), n);
-                 color += specular * specularCoeff;
-             }
-         
-             // Gamma correction
-             color = pow(color, vec3(1.0 / 2.2));
-         
-             outputColor = vec4(color, 1.0);
+         vec3 rgb2lin(vec3 rgb) { // sRGB to linear approximation
+           return pow(rgb, vec3(2.2));
          }
+         
+         vec3 lin2rgb(vec3 lin) { // linear to sRGB approximation
+           return pow(lin, vec3(1.0 / 2.2));
+         }
+         
+         vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+           return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+         }
+         
+         float D_GGX(float NoH, float roughness) {
+           float alpha = roughness * roughness;
+           float alpha2 = alpha * alpha;
+           float NoH2 = NoH * NoH;
+           float b = (NoH2 * (alpha2 - 1.0) + 1.0);
+           return alpha2 * RECIPROCAL_PI / (b * b);
+         }
+         
+         float G1_GGX_Schlick(float NoV, float roughness) {
+           float alpha = roughness * roughness;
+           float k = alpha / 2.0;
+           return max(NoV, 0.001) / (NoV * (1.0 - k) + k);
+         }
+         
+         float G_Smith(float NoV, float NoL, float roughness) {
+           return G1_GGX_Schlick(NoL, roughness) * G1_GGX_Schlick(NoV, roughness);
+         }
+         
+         float fresnelSchlick90(float cosTheta, float F0, float F90) {
+            return F0 + (F90 - F0) * pow(1.0 - cosTheta, 5.0);
+          }
+          
+          float disneyDiffuseFactor(float NoV, float NoL, float VoH, float roughness) {
+            float alpha = roughness * roughness;
+            float F90 = 0.5 + 2.0 * alpha * VoH * VoH;
+            float F_in = fresnelSchlick90(NoL, 1.0, F90);
+            float F_out = fresnelSchlick90(NoV, 1.0, F90);
+            return F_in * F_out;
+          }
+          
+          vec3 microfacetBRDF(in vec3 L, in vec3 V, in vec3 N,
+                                  in float metallic, in float roughness, in vec3 baseColor, in float reflectance) {
+          
+            vec3 H = normalize(V + L);
+          
+            float NoV = clamp(dot(N, V), 0.0, 1.0);
+            float NoL = clamp(dot(N, L), 0.0, 1.0);
+            float NoH = clamp(dot(N, H), 0.0, 1.0);
+            float VoH = clamp(dot(V, H), 0.0, 1.0);
+          
+            vec3 f0 = vec3(0.16 * (reflectance * reflectance));
+            f0 = mix(f0, baseColor, metallic);
+          
+            vec3 F = fresnelSchlick(VoH, f0);
+            float D = D_GGX(NoH, roughness);
+            float G = G_Smith(NoV, NoL, roughness);
+          
+            vec3 spec = (F * D * G) / (4.0 * max(NoV, 0.001) * max(NoL, 0.001));
+          
+            vec3 rhoD = baseColor;
+          
+            // optionally
+            rhoD *= vec3(1.0) - F;
+            // rhoD *= disneyDiffuseFactor(NoV, NoL, VoH, roughness);
+          
+            rhoD *= (1.0 - metallic);
+          
+            vec3 diff = rhoD * RECIPROCAL_PI;
+          
+            return diff + spec;
+          }
+          
+          void main() {
+          
+              vec3 baseColor = vColor;
+              
+              if (shading == 1) {
+                               baseColor *= texture(myTexture, vTexCoord).rgb;
+                           }
+              
+              vec3 L = normalize(-lightDir);
+              vec3 V = normalize(-vViewPos);
+              vec3 N = normalize(vNormal);
+              
+              float r = max(roughness, 0.04);
+          
+              vec3 radiance = vec3(0.0);
+          
+              float irradiance = max(dot(L, N), 0.0);
+              if (irradiance > 0.0) {
+                  vec3 brdf = microfacetBRDF(
+                      L, V, N,
+                      metallic,
+                      r,
+                      baseColor,  // baseColor placeholder
+                      0.5 // reflectance placeholder
+                  );
+                  radiance += brdf * irradiance * uIrradiPerp; // ;
+              }
+          
+              outputColor.rgb = lin2rgb(radiance);
+              outputColor.a = 1.0;
+          }
+          
          
         """
         };
@@ -563,6 +658,8 @@ class Renderer2 implements GLEventListener {
         shadeLoc = gl.glGetUniformLocation(progID, "shading");
         lightDirLoc = gl.glGetUniformLocation(progID, "lightDir");
         modeLoc = gl.glGetUniformLocation(progID, "mode");
+        metallicLoc = gl.glGetUniformLocation(progID, "metallic");
+        roughnessLoc = gl.glGetUniformLocation(progID, "roughness");
     }
 
     private void printShaderInfoLog(GLAutoDrawable d, int obj) {
@@ -980,24 +1077,24 @@ class Game {
         }
     }
 
-        private void applyPowerUp (Player player){
-            powerUpActive = true;
-            powerUpStartTime = System.currentTimeMillis();
-            powerUpType = powerUp.type;
+    private void applyPowerUp (Player player){
+        powerUpActive = true;
+        powerUpStartTime = System.currentTimeMillis();
+        powerUpType = powerUp.type;
 
-            switch (powerUpType) {
-                case 1 -> player.applySpeedBoost();
-                case 2 -> player.enlargePaddle();
-            }
+        switch (powerUpType) {
+            case 1 -> player.applySpeedBoost();
+            case 2 -> player.enlargePaddle();
         }
+    }
 
-        private void removePowerUp (Player player){
-            powerUpActive = false;
-            switch (powerUpType) {
-                case 1 -> player.removeSpeedBoost();
-                case 2 -> player.resetPaddleSize();
-            }
+    private void removePowerUp (Player player){
+        powerUpActive = false;
+        switch (powerUpType) {
+            case 1 -> player.removeSpeedBoost();
+            case 2 -> player.resetPaddleSize();
         }
+    }
 
 }
 
