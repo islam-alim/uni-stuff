@@ -27,6 +27,8 @@ class Renderer2 implements GLEventListener {
     Shader shader = new Shader();
 
     public float t = 0.0f;
+    public float time = 0.0f;
+
     public int modeVal = 0; // shading mode
     int courtTexID = 0;
     int powerUpGrowTex;
@@ -70,6 +72,7 @@ class Renderer2 implements GLEventListener {
         uploadModel(gl, x, y, -2.0f, 0.0f, 0.0f, 0.0f, 0.25f, 0.25f, 0.25f);
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glUniform1i(shader.firstFeatureLoc, 0);
         gl.glBindVertexArray(vaoDigits[digit]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
         gl.glBindVertexArray(0);
@@ -77,6 +80,7 @@ class Renderer2 implements GLEventListener {
         uploadModel(gl, x, y, -2.5f, 0.0f, 0.0f, 0.0f, 0.25f, 0.25f, 0.0f);
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 1);
+        gl.glUniform1i(shader.firstFeatureLoc, 0);
         gl.glBindVertexArray(vaoDigits[digit]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
         gl.glBindVertexArray(0);
@@ -86,6 +90,7 @@ class Renderer2 implements GLEventListener {
         uploadModel(gl, x, y, -2.0f, 0.0f, 0.0f, rotationDeg, scale, scale, scale);
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glUniform1i(shader.firstFeatureLoc, 0);
         gl.glBindVertexArray(vaoBall[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoBall);
         gl.glBindVertexArray(0);
@@ -93,6 +98,7 @@ class Renderer2 implements GLEventListener {
         uploadModel(gl, x, y, -2.5f, 0.0f, 0.0f, rotationDeg, scale, scale, 0.0f);
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 1);
+        gl.glUniform1i(shader.firstFeatureLoc, 0);
         gl.glUniform4f(shader.colorLoc, 0.5f,  0.5f, 0.5f, 1.0f);
         gl.glBindVertexArray(vaoBall[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoBall);
@@ -104,6 +110,7 @@ class Renderer2 implements GLEventListener {
         uploadModel(gl, x, y, -2.0f, 0.0f, 0.0f, rotation, scale / 1.0f, player.paddleHeight, scale / 2.0f);
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glUniform1i(shader.firstFeatureLoc, 0);
         gl.glBindVertexArray(vaoPlayer[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayer);
         gl.glBindVertexArray(0);
@@ -111,6 +118,7 @@ class Renderer2 implements GLEventListener {
         uploadModel(gl, x, y, -2.5f, 0.0f, 0.0f, rotation, scale / 1.0f, player.paddleHeight, 0.0f);
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 1);
+        gl.glUniform1i(shader.firstFeatureLoc, 0);
         gl.glBindVertexArray(vaoPlayer[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayer);
         gl.glBindVertexArray(0);
@@ -121,6 +129,7 @@ class Renderer2 implements GLEventListener {
         gl.glBindTexture(GL.GL_TEXTURE_2D, courtTexID);
         gl.glUniform1i(shader.shadeLoc, 1);
         gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glUniform1i(shader.firstFeatureLoc, 1);
         gl.glUniform1f(shader.metallicLoc, 0.0f);
         uploadModel(gl, x, y, -1.2f, 0.0f, rotation, 0.0f, scale, scale, scale);
 
@@ -134,6 +143,7 @@ class Renderer2 implements GLEventListener {
         if (!powerUp.active) return;
         gl.glUniform1i(shader.shadeLoc, 1);
         gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glUniform1i(shader.firstFeatureLoc, 0);
         int tex = (powerUp.type == 1) ? powerUpFlashTex : powerUpGrowTex;
         gl.glBindTexture(GL.GL_TEXTURE_2D, tex);
 
@@ -455,6 +465,12 @@ class Renderer2 implements GLEventListener {
         t += offset;
 
         game.step();
+
+
+        time += 0.0001f;
+        gl.glUniform1f(shader.timeLoc, time);
+        gl.glUniform2f(shader.ballPosLoc, game.ball.posx, game.ball.posy);
+
 
         //shader.setupShaders(d);
     }
@@ -985,6 +1001,9 @@ class Shader {
     static int metallicLoc = 0;
     static int roughnessLoc = 0;
     static int shadeLoc = 0;//Renderer2.shadeLoc;
+    static int firstFeatureLoc = 0;
+    static int timeLoc = 0;
+    static int ballPosLoc = 0;
 
     public void setupShaders(GLAutoDrawable d) {
         GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
@@ -1043,6 +1062,10 @@ class Shader {
          
          uniform float metallic;
          uniform float roughness;
+         
+         uniform float time;
+         uniform vec2 ballPos;
+         uniform int firstFeature;
          
          const vec4 uLightColor = vec4(1.0, 1.0, 1.0, 1.0);
          const float uIrradiPerp = 1.0;
@@ -1124,9 +1147,29 @@ class Shader {
             return diff + spec;
           }
           
-          void main() {
+          float rand(vec2 co){
+              return fract(sin(dot(floor(co.xy) ,vec2(11,1)+tan(time*0.01)))*500.0);
+          }
           
-              vec3 baseColor = vColor;
+          void main() {
+              vec3 baseColor;
+              vec4 fragColor;
+              vec2 resolution = vec2(1366.0, 768.0);
+              
+              
+              vec2 position = gl_FragCoord.xy - (ballPos * resolution);
+              
+          	  float color = rand(position.xy*(0.25 + asin(sin(time))*0.1));
+          	  //if (color < 0.5) color = 0.0; else color = 1.0;
+          	  color = (floor(color * 4.0) + 0.0)/4.0;
+          	  fragColor = vec4( color, sin(color*time*2.0), cos(color+time*3.0), 1 );
+          
+              if (firstFeature == 1) {
+                baseColor = fragColor.rgb;
+              } else {
+                baseColor = vColor;
+              }
+              
               
               if (shading == 1) { baseColor *= texture(myTexture, vTexCoord).rgb; }
               
@@ -1211,6 +1254,10 @@ class Shader {
         metallicLoc = gl.glGetUniformLocation(progID, "metallic");
         roughnessLoc = gl.glGetUniformLocation(progID, "roughness");
         shadowLoc = gl.glGetUniformLocation(progID, "shadow");
+        firstFeatureLoc = gl.glGetUniformLocation(progID, "firstFeature");
+        timeLoc = gl.glGetUniformLocation(progID, "time");
+        ballPosLoc = gl.glGetUniformLocation(progID, "ballPos");
+
 
     }
 
