@@ -6,6 +6,7 @@ import javax.imageio.ImageIO;
 import javax.swing.*;
 
 import com.jogamp.common.nio.Buffers;
+import com.jogamp.math.Matrix4f;
 import com.jogamp.opengl.*;
 import com.jogamp.opengl.awt.GLCanvas;
 import com.jogamp.opengl.util.FPSAnimator;
@@ -22,6 +23,8 @@ import java.nio.IntBuffer;
 class Renderer2 implements GLEventListener {
 
     Game game;
+
+    Shader shader = new Shader();
 
     public float t = 0.0f;
     public int modeVal = 0; // shading mode
@@ -54,41 +57,43 @@ class Renderer2 implements GLEventListener {
     private int[] vaoPowerUp = new int[1];
     private int powerUpVertexCount;
     private int[] vaoDigits = new int[4]; // 0,1,2,3
-    private static final int STRIDE = (3+4+2+3) * Buffers.SIZEOF_FLOAT;
+    static final int STRIDE = (3+4+2+3) * Buffers.SIZEOF_FLOAT;
 
     // Shaders
-    private int progID = 0;
-    private int vertID = 0;
-    private int fragID = 0;
+    //static int progID = 0;
+    //static int vertID = 0;
+    //static int fragID = 0;
 
-    // Attribute Locations
-    private int vertexLoc = 0;
-    private int colorLoc = 0;
-    private int texCoordLoc = 0;
-    private int normalLoc = 0;
-
-    // Uniform Locations
-    private int projectionLoc = 0;
-    private int modelviewLoc = 0;
-    private int normalMatrixLoc = 0;
-    private int texLoc = 0;
-    private int shadeLoc = 0;
-    private int lightDirLoc = 0;
-    private int modeLoc = 0;
-    private int metallicLoc = 0;
-    private int roughnessLoc = 0;
+    //static int shadeLoc = 0;
 
     public void drawDigit(GL3 gl, float x, float y, int digit, int vertexCount) {
-        uploadModel(gl, x, y, -2.0f, 0.0f, 0.25f, 0.25f, 0.25f);
-        gl.glUniform1i(shadeLoc, 0);
+        uploadModel(gl, x, y, -2.0f, 0.0f, 0.0f, 0.0f, 0.25f, 0.25f, 0.25f);
+        gl.glUniform1i(shader.shadeLoc, 0);
+        gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glBindVertexArray(vaoDigits[digit]);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
+        gl.glBindVertexArray(0);
+
+        uploadModel(gl, x, y, -2.5f, 0.0f, 0.0f, 0.0f, 0.25f, 0.25f, 0.0f);
+        gl.glUniform1i(shader.shadeLoc, 0);
+        gl.glUniform1i(shader.shadowLoc, 1);
         gl.glBindVertexArray(vaoDigits[digit]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
         gl.glBindVertexArray(0);
     }
 
     public void drawBall(GL3 gl, float x, float y, float rotationDeg, float scale) {
-        uploadModel(gl, x, y, -2.0f, rotationDeg, scale, scale, scale);
-        gl.glUniform1i(shadeLoc, 0);
+        uploadModel(gl, x, y, -2.0f, 0.0f, 0.0f, rotationDeg, scale, scale, scale);
+        gl.glUniform1i(shader.shadeLoc, 0);
+        gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glBindVertexArray(vaoBall[0]);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoBall);
+        gl.glBindVertexArray(0);
+
+        uploadModel(gl, x, y, -2.5f, 0.0f, 0.0f, rotationDeg, scale, scale, 0.0f);
+        gl.glUniform1i(shader.shadeLoc, 0);
+        gl.glUniform1i(shader.shadowLoc, 1);
+        gl.glUniform4f(shader.colorLoc, 0.5f,  0.5f, 0.5f, 1.0f);
         gl.glBindVertexArray(vaoBall[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoBall);
         gl.glBindVertexArray(0);
@@ -96,8 +101,16 @@ class Renderer2 implements GLEventListener {
 
     public void drawBat(GL3 gl, Player player, float x, float y, float rotation, float scale) {
 
-        uploadModel(gl, x, y, -2.0f, rotation, scale / 2.0f, player.paddleHeight, scale / 2.0f);
-        gl.glUniform1i(shadeLoc, 0);
+        uploadModel(gl, x, y, -2.0f, 0.0f, 0.0f, rotation, scale / 1.0f, player.paddleHeight, scale / 2.0f);
+        gl.glUniform1i(shader.shadeLoc, 0);
+        gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glBindVertexArray(vaoPlayer[0]);
+        gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayer);
+        gl.glBindVertexArray(0);
+
+        uploadModel(gl, x, y, -2.5f, 0.0f, 0.0f, rotation, scale / 1.0f, player.paddleHeight, 0.0f);
+        gl.glUniform1i(shader.shadeLoc, 0);
+        gl.glUniform1i(shader.shadowLoc, 1);
         gl.glBindVertexArray(vaoPlayer[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayer);
         gl.glBindVertexArray(0);
@@ -106,8 +119,10 @@ class Renderer2 implements GLEventListener {
     public void drawPlayingField(GL3 gl, float x, float y, float rotation, float scale) {
 
         gl.glBindTexture(GL.GL_TEXTURE_2D, courtTexID);
-        gl.glUniform1i(shadeLoc, 1);
-        uploadModelYRotation(gl, x, y, -1.2f, rotation, scale, scale, scale);
+        gl.glUniform1i(shader.shadeLoc, 1);
+        gl.glUniform1i(shader.shadowLoc, 0);
+        gl.glUniform1f(shader.metallicLoc, 0.0f);
+        uploadModel(gl, x, y, -1.2f, 0.0f, rotation, 0.0f, scale, scale, scale);
 
         gl.glBindVertexArray(vaoPlayingField[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayingField);
@@ -117,11 +132,12 @@ class Renderer2 implements GLEventListener {
     public void drawPowerUp(GL3 gl, PowerUp powerUp, float scale) {
 
         if (!powerUp.active) return;
-        gl.glUniform1i(shadeLoc, 1);
+        gl.glUniform1i(shader.shadeLoc, 1);
+        gl.glUniform1i(shader.shadowLoc, 0);
         int tex = (powerUp.type == 1) ? powerUpFlashTex : powerUpGrowTex;
         gl.glBindTexture(GL.GL_TEXTURE_2D, tex);
 
-        uploadModel(gl, powerUp.posX, powerUp.posY,-2.0f,0.0f, scale, scale, scale);
+        uploadModel(gl, powerUp.posX, powerUp.posY,-2.0f,0.0f, 0.0f, 0.0f, scale, scale, scale);
 
         gl.glBindVertexArray(vaoPowerUp[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, powerUpVertexCount);
@@ -135,12 +151,11 @@ class Renderer2 implements GLEventListener {
         GL3 gl = d.getGL().getGL3();
         gl.glEnable(GL.GL_DEPTH_TEST);
 
-        setupShaders(d);
+        shader.setupShaders(d);
 
         courtTexID = loadTexture(d, "interstellar.png");
         powerUpGrowTex = loadTexture(d, "powerup_icons_grow.png");
         powerUpFlashTex = loadTexture(d, "powerup_icons_flash.png");
-
 
         // assuming the following structure of input vertex data
         // struct Vertex {
@@ -175,7 +190,7 @@ class Renderer2 implements GLEventListener {
         gl.glBindVertexArray(vaoBall[0]);
         gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdBall[0]);
 
-        setupVAO(gl, vaoBall[0], vertBufIdBall[0], vertNoBall);
+        shader.setupVAO(gl, vaoBall[0], vertBufIdBall[0], vertNoBall);
 
         gl.glBindVertexArray(0);
 
@@ -194,7 +209,7 @@ class Renderer2 implements GLEventListener {
         gl.glBindVertexArray(vaoPlayer[0]);
         gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPlayer[0]);
 
-        setupVAO(gl, vaoPlayer[0], vertBufIdPlayer[0], vertNoPlayer);
+        shader.setupVAO(gl, vaoPlayer[0], vertBufIdPlayer[0], vertNoPlayer);
 
         gl.glBindVertexArray(0);
 
@@ -213,7 +228,7 @@ class Renderer2 implements GLEventListener {
         gl.glBindVertexArray(vaoPlayingField[0]);
         gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPlayingField[0]);
 
-        setupVAO(gl, vaoPlayingField[0], vertBufIdPlayingField[0], vertNoPlayingField);
+        shader.setupVAO(gl, vaoPlayingField[0], vertBufIdPlayingField[0], vertNoPlayingField);
 
         gl.glBindVertexArray(0);
 
@@ -272,7 +287,7 @@ class Renderer2 implements GLEventListener {
 
             gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, digitVBOs[i][0]);
 
-            setupVAO(gl, vaoDigits[i], digitVBOs[i][0], digitVertCounts[i]);
+            shader.setupVAO(gl, vaoDigits[i], digitVBOs[i][0], digitVertCounts[i]);
 
             gl.glBindVertexArray(0);
         }
@@ -291,7 +306,7 @@ class Renderer2 implements GLEventListener {
         gl.glBindVertexArray(vaoPowerUp[0]);
         gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vertBufIdPowerUp[0]);
 
-        setupVAO(gl, vaoPowerUp[0], vertBufIdPowerUp[0], vertNoPowerUp);
+        shader.setupVAO(gl, vaoPowerUp[0], vertBufIdPowerUp[0], vertNoPowerUp);
 
         gl.glBindVertexArray(0);
 
@@ -305,10 +320,10 @@ class Renderer2 implements GLEventListener {
 
         float aspect = (float) width / (float) height;
 
-        float[] proj = makePerspective(60.0f, aspect, 1.0f, 5.0f);
+        float[] proj = makePerspective(60.0f, aspect, 1.0f, 6.0f);
 
-        gl.glUseProgram(progID);
-        gl.glUniformMatrix4fv(projectionLoc, 1, false, proj, 0);
+        gl.glUseProgram(shader.progID);
+        gl.glUniformMatrix4fv(Shader.projectionLoc, 1, false, proj, 0);
         gl.glUseProgram(0);
     }
 
@@ -345,48 +360,50 @@ class Renderer2 implements GLEventListener {
 
     @Override
     public void display (GLAutoDrawable d) {
+
         GL3 gl = d.getGL().getGL3();
 
         gl.glClear(GL.GL_COLOR_BUFFER_BIT | GL.GL_DEPTH_BUFFER_BIT);
 
-        gl.glUseProgram(progID);
-        gl.glUniform1i(modeLoc, MyGui2.renderer2.modeVal);
+        gl.glUseProgram(shader.progID);
+        gl.glUniform1i(Shader.modeLoc, MyGui2.renderer2.modeVal);
 
         switch (MyGui2.renderer2.modeVal) {
             case 1:
-                gl.glUniform3f(lightDirLoc, 0.0f, -1.0f, 0.0f);
+                gl.glUniform3f(Shader.lightDirLoc, 0.0f, -1.0f, 0.0f);
                 break;
             case 2:
-                gl.glUniform3f(lightDirLoc, 0.0f, 1.0f, 0.0f);
+                gl.glUniform3f(Shader.lightDirLoc, 0.0f, 1.0f, 0.0f);
                 break;
             case 3:
-                gl.glUniform3f(lightDirLoc, -1.0f, -1.0f, 0.0f);
+                gl.glUniform3f(Shader.lightDirLoc, -1.0f, -1.0f, 0.0f);
                 break;
             case 4:
-                gl.glUniform3f(lightDirLoc, -game.ball.posx, -game.ball.posy, 1.0f);
+                gl.glUniform3f(Shader.lightDirLoc, -game.ball.posx, -game.ball.posy, 2.0f);
                 break;
-            case 5:
-                gl.glUniform1f(metallicLoc, 0.0f);
+            /*case 5:
+                gl.glUniform1f(Shader.metallicLoc, 0.0f);
                 break;
             case 6:
-                gl.glUniform1f(metallicLoc, 1.0f);
-                break;
+                gl.glUniform1f(Shader.metallicLoc, 1.0f);
+                break;*/
             case 7:
-                gl.glUniform1f(roughnessLoc, 0.1f);
+                gl.glUniform1f(Shader.roughnessLoc, 0.1f);
                 break;
             case 8:
-                gl.glUniform1f(roughnessLoc, 0.2f);
+                gl.glUniform1f(Shader.roughnessLoc, 0.2f);
                 break;
         }
 
+        gl.glUniform1f(Shader.metallicLoc, Shader.metallicness);
         float[] modelviewMatrix = new float[16];
         for (int i = 0; i < 16; i++) modelviewMatrix[i] = 0f;
         modelviewMatrix[0] = 1; modelviewMatrix[5] = 1; modelviewMatrix[10] = 1; modelviewMatrix[15] = 1;
 
-        gl.glUniformMatrix4fv(modelviewLoc, 1, false, modelviewMatrix, 0);
+        gl.glUniformMatrix4fv(Shader.modelviewLoc, 1, false, modelviewMatrix, 0);
 
         gl.glActiveTexture(GL3.GL_TEXTURE0);
-        gl.glUniform1i(texLoc, 0);
+        gl.glUniform1i(Shader.texLoc, 0);
 
         float[] identityNormal = {
                 1,0,0,
@@ -394,16 +411,11 @@ class Renderer2 implements GLEventListener {
                 0,0,1
         };
 
-        gl.glUniformMatrix3fv(normalMatrixLoc, 1, false, identityNormal, 0);
+        gl.glUniformMatrix3fv(Shader.normalMatrixLoc, 1, false, identityNormal, 0);
 
         drawBall(gl, game.ball.posx, game.ball.posy, game.ball.rotation, 0.15f);
         drawBat(gl, game.player1, game.player1.posX, game.player1.posY, 270.0f, 1f);
         drawBat(gl, game.player2, game.player2.posX, game.player2.posY, 90.0f, 1f);
-
-        gl.glBindTexture(GL.GL_TEXTURE_2D, courtTexID);
-        drawPlayingField(gl, 0.0f, 0.0f, t, 2.0f);
-        float offset = 0.01f;
-        t += offset;
 
         drawPowerUp(gl, game.powerUp, 0.07f);
 
@@ -436,290 +448,18 @@ class Renderer2 implements GLEventListener {
                 drawDigit(gl, 0.1f, 1.0f, 3, vertNo_3);
                 break;
         }
+
+        gl.glBindTexture(GL.GL_TEXTURE_2D, courtTexID);
+        drawPlayingField(gl, 0.0f, 0.0f, t, 2.0f);
+        float offset = 0.01f;
+        t += offset;
+
         game.step();
-    }
 
-    public void setupShaders(GLAutoDrawable d) {
-        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
-
-        vertID = gl.glCreateShader(GL3.GL_VERTEX_SHADER);
-        fragID = gl.glCreateShader(GL3.GL_FRAGMENT_SHADER);
-
-        String[] vs = new String[]{
-                """
-        #version 150
-        
-        in vec3 inputPosition;
-        in vec4 inputColor;
-        in vec2 inputTexCoord;
-        in vec3 inputNormal;
-        
-        uniform mat4 projection;
-        uniform mat4 modelview;
-        uniform mat3 normalMatrix;
-        
-        out vec3 vColor;
-        out vec2 vTexCoord;
-        out vec3 vNormal;
-        out vec3 vViewPos;
-        
-        void main()
-        {
-            vColor = inputColor.rgb;
-            vTexCoord = inputTexCoord;
-            vNormal = normalMatrix * inputNormal;
-            vec4 viewPos4 = modelview * vec4(inputPosition, 1.0);
-            vViewPos = viewPos4.xyz;
-            gl_Position = projection * viewPos4;
-        }
-        
-        """
-        };
-
-        String[] fs = new String[]{
-                """
-         #version 150
-        
-         in vec3 vColor;
-         in vec2 vTexCoord;
-         in vec3 vNormal;
-         in vec3 vViewPos;
-         
-         out vec4 outputColor;
-         
-         uniform sampler2D myTexture;
-         uniform int shading;
-         uniform vec3 lightDir;
-         uniform int mode;
-         
-         uniform float metallic;
-         uniform float roughness;
-         
-         const vec4 uLightColor = vec4(1.0, 1.0, 1.0, 1.0);
-         const float uIrradiPerp = 5.0;
-         
-         
-         #define RECIPROCAL_PI 0.3183098861837907
-         
-         vec3 rgb2lin(vec3 rgb) { // sRGB to linear approximation
-           return pow(rgb, vec3(2.2));
-         }
-         
-         vec3 lin2rgb(vec3 lin) { // linear to sRGB approximation
-           return pow(lin, vec3(1.0 / 2.2));
-         }
-         
-         vec3 fresnelSchlick(float cosTheta, vec3 F0) {
-           return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
-         }
-         
-         float D_GGX(float NoH, float roughness) {
-           float alpha = roughness * roughness;
-           float alpha2 = alpha * alpha;
-           float NoH2 = NoH * NoH;
-           float b = (NoH2 * (alpha2 - 1.0) + 1.0);
-           return alpha2 * RECIPROCAL_PI / (b * b);
-         }
-         
-         float G1_GGX_Schlick(float NoV, float roughness) {
-           float alpha = roughness * roughness;
-           float k = alpha / 2.0;
-           return max(NoV, 0.001) / (NoV * (1.0 - k) + k);
-         }
-         
-         float G_Smith(float NoV, float NoL, float roughness) {
-           return G1_GGX_Schlick(NoL, roughness) * G1_GGX_Schlick(NoV, roughness);
-         }
-         
-         float fresnelSchlick90(float cosTheta, float F0, float F90) {
-            return F0 + (F90 - F0) * pow(1.0 - cosTheta, 5.0);
-          }
-          
-          float disneyDiffuseFactor(float NoV, float NoL, float VoH, float roughness) {
-            float alpha = roughness * roughness;
-            float F90 = 0.5 + 2.0 * alpha * VoH * VoH;
-            float F_in = fresnelSchlick90(NoL, 1.0, F90);
-            float F_out = fresnelSchlick90(NoV, 1.0, F90);
-            return F_in * F_out;
-          }
-          
-          vec3 microfacetBRDF(in vec3 L, in vec3 V, in vec3 N,
-                                  in float metallic, in float roughness, in vec3 baseColor, in float reflectance) {
-          
-            vec3 H = normalize(V + L);
-          
-            float NoV = clamp(dot(N, V), 0.0, 1.0);
-            float NoL = clamp(dot(N, L), 0.0, 1.0);
-            float NoH = clamp(dot(N, H), 0.0, 1.0);
-            float VoH = clamp(dot(V, H), 0.0, 1.0);
-          
-            vec3 f0 = vec3(0.16 * (reflectance * reflectance));
-            f0 = mix(f0, baseColor, metallic);
-          
-            vec3 F = fresnelSchlick(VoH, f0);
-            float D = D_GGX(NoH, roughness);
-            float G = G_Smith(NoV, NoL, roughness);
-          
-            vec3 spec = (F * D * G) / (4.0 * max(NoV, 0.001) * max(NoL, 0.001));
-          
-            vec3 rhoD = baseColor;
-          
-            // optionally
-            rhoD *= vec3(1.0) - F;
-            // rhoD *= disneyDiffuseFactor(NoV, NoL, VoH, roughness);
-          
-            rhoD *= (1.0 - metallic);
-          
-            vec3 diff = rhoD * RECIPROCAL_PI;
-          
-            return diff + spec;
-          }
-          
-          void main() {
-          
-              vec3 baseColor = vColor;
-              
-              if (shading == 1) { baseColor *= texture(myTexture, vTexCoord).rgb; }
-              
-              vec3 L = normalize(lightDir);
-              vec3 V = normalize(vViewPos);
-              vec3 N = normalize(vNormal);
-              
-              float r = max(roughness, 0.04);
-          
-              vec3 radiance = vec3(0.0);
-          
-              float irradiance = max(dot(L, N), 0.0);
-              if (irradiance > 0.0) {
-                  vec3 brdf = microfacetBRDF(
-                      L, V, N,
-                      metallic,
-                      r,
-                      baseColor,  // baseColor placeholder
-                      0.5 // reflectance placeholder
-                  );
-                  radiance += brdf * irradiance * uIrradiPerp; // ;
-              }
-          
-              outputColor.rgb = lin2rgb(radiance);
-              outputColor.a = 1.0;
-          }
-          
-         
-        """
-        };
-
-        gl.glShaderSource(vertID, 1, vs, null, 0);
-        gl.glShaderSource(fragID, 1, fs, null, 0);
-
-        // compile the shader
-        gl.glCompileShader(vertID);
-        gl.glCompileShader(fragID);
-
-        // check for errors
-        printShaderInfoLog(d, vertID);
-        printShaderInfoLog(d, fragID);
-
-        // create program and attach shaders
-        progID = gl.glCreateProgram();
-        gl.glAttachShader(progID, vertID);
-        gl.glAttachShader(progID, fragID);
-
-        // "outColor" is a user-provided OUT variable
-        // of the fragment shader.
-        // Its output is bound to the first color buffer
-        // in the framebuffer
-        gl.glBindFragDataLocation(progID, 0, "outputColor");
-
-        // link the program
-        gl.glLinkProgram(progID);
-        // output error messages
-        printProgramInfoLog(d, progID);
-
-        // "inputPosition" and "inputColor" are user-provided
-        // IN variables of the vertex shader.
-        // Their locations are stored to be used later with
-        // glEnableVertexAttribArray()
-        vertexLoc = gl.glGetAttribLocation(progID, "inputPosition");
-        colorLoc = gl.glGetAttribLocation(progID, "inputColor");
-        texCoordLoc = gl.glGetAttribLocation(progID, "inputTexCoord");
-        normalLoc = gl.glGetAttribLocation(progID, "inputNormal");
-
-        // "projection" and "modelview" are user-provided
-        // UNIFORM variables of the vertex shader.
-        // Their locations are stored to be used later
-        projectionLoc = gl.glGetUniformLocation(progID, "projection");
-        modelviewLoc = gl.glGetUniformLocation(progID, "modelview");
-        normalMatrixLoc =  gl.glGetUniformLocation(progID, "normalMatrix");
-        texLoc = gl.glGetUniformLocation(progID, "myTexture");
-        shadeLoc = gl.glGetUniformLocation(progID, "shading");
-        lightDirLoc = gl.glGetUniformLocation(progID, "lightDir");
-        modeLoc = gl.glGetUniformLocation(progID, "mode");
-        metallicLoc = gl.glGetUniformLocation(progID, "metallic");
-        roughnessLoc = gl.glGetUniformLocation(progID, "roughness");
-    }
-
-    private void printShaderInfoLog(GLAutoDrawable d, int obj) {
-        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
-        IntBuffer infoLogLengthBuf = IntBuffer.allocate(1);
-        int infoLogLength;
-        gl.glGetShaderiv(obj, GL3.GL_INFO_LOG_LENGTH, infoLogLengthBuf);
-        infoLogLength = infoLogLengthBuf.get(0);
-        if (infoLogLength > 0) {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(infoLogLength);
-            gl.glGetShaderInfoLog(obj, infoLogLength, infoLogLengthBuf, byteBuffer);
-            for (byte b : byteBuffer.array()) {
-                System.err.print((char) b);
-            }
-        }
+        //shader.setupShaders(d);
     }
 
 
-    private void printProgramInfoLog(GLAutoDrawable d, int obj) {
-        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
-        IntBuffer infoLogLengthBuf = IntBuffer.allocate(1);
-        int infoLogLength;
-        gl.glGetProgramiv(obj, GL3.GL_INFO_LOG_LENGTH, infoLogLengthBuf);
-        infoLogLength = infoLogLengthBuf.get(0);
-        if (infoLogLength > 0) {
-            ByteBuffer byteBuffer = ByteBuffer.allocate(infoLogLength);
-            gl.glGetProgramInfoLog(obj, infoLogLength, infoLogLengthBuf, byteBuffer);
-            for (byte b : byteBuffer.array()) {
-                System.err.print((char) b);
-            }
-        }
-    }
-
-    private void setupVAO(GL3 gl, int vaoId, int vboId, int vertexCount) {
-        gl.glBindVertexArray(vaoId);
-        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vboId);
-
-        if (vertexLoc >= 0) {
-            gl.glEnableVertexAttribArray(vertexLoc);
-            gl.glVertexAttribPointer(vertexLoc, 3, GL3.GL_FLOAT, false, STRIDE, 0);
-        }
-
-        long colorOffset = 3 * Buffers.SIZEOF_FLOAT;
-        if (colorLoc >= 0) {
-            gl.glEnableVertexAttribArray(colorLoc);
-            gl.glVertexAttribPointer(colorLoc, 4, GL3.GL_FLOAT, false, STRIDE, colorOffset);
-        }
-
-        long texOffset = (3 + 4) * Buffers.SIZEOF_FLOAT;
-        if (texCoordLoc >= 0) {
-            gl.glEnableVertexAttribArray(texCoordLoc);
-            gl.glVertexAttribPointer(texCoordLoc, 2, GL3.GL_FLOAT, false, STRIDE, texOffset);
-        }
-
-        long normalOffset = (3 + 4 + 2) * Buffers.SIZEOF_FLOAT;
-        if (normalLoc >= 0) {
-            gl.glEnableVertexAttribArray(normalLoc);
-            gl.glVertexAttribPointer(normalLoc, 3, GL3.GL_FLOAT, false, STRIDE, normalOffset);
-        }
-
-        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
-        gl.glBindVertexArray(0);
-    }
 
     private float[] makePerspective(float fovyDeg, float aspect, float zNear, float zFar) {
         float fovy = (float)Math.toRadians(fovyDeg);
@@ -734,54 +474,23 @@ class Renderer2 implements GLEventListener {
         return m;
     }
 
-    private void uploadModel(GL3 gl, float x, float y, float z, float rotationDeg, float sx, float sy, float sz) {
+    private void uploadModel(GL3 gl, float x, float y, float z, float rx, float ry, float rz, float sx, float sy, float sz) {
 
-        float[] m = new float[16];
+        // setup modelview transformation
+        Matrix4f modelview = new Matrix4f();
+        modelview.loadIdentity();
+        modelview.translate(x, y, z, new Matrix4f());
+        modelview.scale(sx, sy, sz, new Matrix4f());
+        modelview.rotate((float) Math.toRadians(rx), 1, 0, 0, new Matrix4f());
+        modelview.rotate((float) Math.toRadians(ry), 0, 1, 0, new Matrix4f());
+        modelview.rotate((float) Math.toRadians(rz), 0, 0, 1, new Matrix4f());
+        gl.glUniformMatrix4fv(Shader.modelviewLoc, 1, false, modelview.get(new float[16]), 0);
 
-        float r = (float) Math.toRadians(rotationDeg);
-        float c = (float) Math.cos(r);
-        float s = (float) Math.sin(r);
+        modelview.transpose();
+        modelview.invert();
 
-        m[0]  = c * sx;   m[4]  = -s * sy;  m[8]  = 0;   m[12] = x;
-        m[1]  = s * sx;   m[5]  =  c * sy;  m[9]  = 0;   m[13] = y;
-        m[2]  = 0;        m[6]  = 0;        m[10] = sz;  m[14] = z;
-        m[3]  = 0;        m[7]  = 0;        m[11] = 0;   m[15] = 1;
-
-        float[] mv3 = new float[9];
-        mv3[0] = m[0]; mv3[1] = m[4]; mv3[2] = m[8];
-        mv3[3] = m[1]; mv3[4] = m[5]; mv3[5] = m[9];
-        mv3[6] = m[2]; mv3[7] = m[6]; mv3[8] = m[10];
-
-        float[] normalMat = inverseTranspose3x3(mv3);
-
-        gl.glUniformMatrix3fv(normalMatrixLoc, 1, false, normalMat, 0);
-        gl.glUniformMatrix4fv(modelviewLoc, 1, false, m, 0);
+        gl.glUniformMatrix4fv(Shader.normalMatrixLoc, 1, false, modelview.get(new float[16]), 0);
     }
-
-    private void uploadModelYRotation(GL3 gl, float x, float y, float z, float rotationDeg, float sx, float sy, float sz) {
-
-        float[] m = new float[16];
-
-        float r = (float) Math.toRadians(rotationDeg);
-        float c = (float) Math.cos(r);
-        float s = (float) Math.sin(r);
-
-        m[0]  = c * sx;  m[4]  = 0;  m[8]  = s * sz;   m[12] = x;
-        m[1]  = 0;       m[5]  = sy; m[9]  = 0;       m[13] = y;
-        m[2]  = -s * sx; m[6]  = 0;  m[10] = c * sz;  m[14] = z;
-        m[3]  = 0;       m[7]  = 0;  m[11] = 0;      m[15] = 1;
-
-        float[] mv3 = new float[9];
-        mv3[0] = m[0]; mv3[1] = m[4]; mv3[2] = m[8];
-        mv3[3] = m[1]; mv3[4] = m[5]; mv3[5] = m[9];
-        mv3[6] = m[2]; mv3[7] = m[6]; mv3[8] = m[10];
-
-        float[] normalMat = inverseTranspose3x3(mv3);
-
-        gl.glUniformMatrix3fv(normalMatrixLoc, 1, false, normalMat, 0);
-        gl.glUniformMatrix4fv(modelviewLoc, 1, false, m, 0);
-    }
-
 
     private float[] loadVertexData(String filename, int perVertexFloats) {
 
@@ -963,6 +672,11 @@ class MyGui2 extends JFrame {
                     case '2': renderer2.modeVal = 2; break;
                     case '3': renderer2.modeVal = 3; break;
                     case '4': renderer2.modeVal = 4; break;
+                    case '5': Shader.metallicness = 0.0f; break;
+                    case '6': Shader.metallicness = 1.0f; break;
+                    case '7': renderer2.modeVal = 7; break;
+                    case '8': renderer2.modeVal = 8; break;
+                    case '9': renderer2.modeVal = 9; break;
                 }
             }
         });
@@ -1092,7 +806,6 @@ class Game {
             case 2 -> player.resetPaddleSize();
         }
     }
-
 }
 
 class Ball {
@@ -1142,7 +855,7 @@ class Ball {
 
         // distance ball to the bat center
         float dx = posx - batCenterX;
-        float dy = posy - batCenterY;
+        float dy = (posy - batCenterY)*0.5f;
 
         float dist2 = dx * dx + dy * dy;
         float minDist = batRadius + ballRadius;
@@ -1246,10 +959,328 @@ class PowerUp {
     }
 }
 
+class Shader {
+
+    static float metallicness = 0.0f;
+
+    int vertID = 0;//Renderer2.vertID;
+    int fragID = 0;//Renderer2.fragID;
+    int progID = 0;//Renderer2.progID;
+
+    // Attribute Locations
+    static int vertexLoc = 0;
+    static int colorLoc = 0;
+    static int texCoordLoc = 0;
+    static int normalLoc = 0;
+
+    // Uniform Locations
+    static int projectionLoc = 0;
+    static int modelviewLoc = 0;
+    static int normalMatrixLoc = 0;
+    static int texLoc = 0;
+    static int shadowLoc = 0;
+
+    static int lightDirLoc = 0;
+    static int modeLoc = 0;
+    static int metallicLoc = 0;
+    static int roughnessLoc = 0;
+    static int shadeLoc = 0;//Renderer2.shadeLoc;
+
+    public void setupShaders(GLAutoDrawable d) {
+        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
+
+        vertID = gl.glCreateShader(GL3.GL_VERTEX_SHADER);
+        fragID = gl.glCreateShader(GL3.GL_FRAGMENT_SHADER);
+
+        String[] vs = new String[]{
+                """
+        #version 150
+        
+        in vec3 inputPosition;
+        in vec4 inputColor;
+        in vec2 inputTexCoord;
+        in vec3 inputNormal;
+        
+        uniform mat4 projection;
+        uniform mat4 modelview;
+        uniform mat4 normalMatrix;
+        
+        out vec3 vColor;
+        out vec2 vTexCoord;
+        out vec3 vNormal;
+        out vec3 vViewPos;
+        
+        void main()
+        {
+            vColor = inputColor.rgb;
+            vTexCoord = inputTexCoord;
+            vNormal = (normalMatrix * vec4(inputNormal, 0.0)).xyz;
+            vec4 viewPos4 = modelview * vec4(inputPosition, 1.0);
+            vViewPos = viewPos4.xyz;
+            gl_Position = projection * viewPos4;
+        }
+        
+        """
+        };
+
+        String[] fs = new String[]{
+                """
+         #version 150
+        
+         in vec3 vColor;
+         in vec2 vTexCoord;
+         in vec3 vNormal;
+         in vec3 vViewPos;
+         
+         out vec4 outputColor;
+         
+         uniform sampler2D myTexture;
+         uniform int shading;
+         uniform vec3 lightDir = vec3(0.0, 0.0, 1.0);
+         uniform int mode;
+         uniform int shadow;
+         
+         
+         uniform float metallic;
+         uniform float roughness;
+         
+         const vec4 uLightColor = vec4(1.0, 1.0, 1.0, 1.0);
+         const float uIrradiPerp = 1.0;
+         
+         
+         #define RECIPROCAL_PI 0.3183098861837907
+         
+         vec3 rgb2lin(vec3 rgb) { // sRGB to linear approximation
+           return pow(rgb, vec3(2.2));
+         }
+         
+         vec3 lin2rgb(vec3 lin) { // linear to sRGB approximation
+           return pow(lin, vec3(1.0 / 2.2));
+         }
+         
+         vec3 fresnelSchlick(float cosTheta, vec3 F0) {
+           return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
+         }
+         
+         float D_GGX(float NoH, float roughness) {
+           float alpha = roughness * roughness;
+           float alpha2 = alpha * alpha;
+           float NoH2 = NoH * NoH;
+           float b = (NoH2 * (alpha2 - 1.0) + 1.0);
+           return alpha2 * RECIPROCAL_PI / (b * b);
+         }
+         
+         float G1_GGX_Schlick(float NoV, float roughness) {
+           float alpha = roughness * roughness;
+           float k = alpha / 2.0;
+           return max(NoV, 0.001) / (NoV * (1.0 - k) + k);
+         }
+         
+         float G_Smith(float NoV, float NoL, float roughness) {
+           return G1_GGX_Schlick(NoL, roughness) * G1_GGX_Schlick(NoV, roughness);
+         }
+         
+         float fresnelSchlick90(float cosTheta, float F0, float F90) {
+            return F0 + (F90 - F0) * pow(1.0 - cosTheta, 5.0);
+          }
+          
+          float disneyDiffuseFactor(float NoV, float NoL, float VoH, float roughness) {
+            float alpha = roughness * roughness;
+            float F90 = 0.5 + 2.0 * alpha * VoH * VoH;
+            float F_in = fresnelSchlick90(NoL, 1.0, F90);
+            float F_out = fresnelSchlick90(NoV, 1.0, F90);
+            return F_in * F_out;
+          }
+          
+          vec3 microfacetBRDF(in vec3 L, in vec3 V, in vec3 N,
+                                  in float metallic, in float roughness, in vec3 baseColor, in float reflectance) {
+          
+            vec3 H = normalize(V + L);
+          
+            float NoV = clamp(dot(N, V), 0.0, 1.0);
+            float NoL = clamp(dot(N, L), 0.0, 1.0);
+            float NoH = clamp(dot(N, H), 0.0, 1.0);
+            float VoH = clamp(dot(V, H), 0.0, 1.0);
+          
+            vec3 f0 = vec3(0.16 * (reflectance * reflectance));
+            f0 = mix(f0, baseColor, metallic);
+          
+            vec3 F = fresnelSchlick(VoH, f0);
+            float D = D_GGX(NoH, roughness);
+            float G = G_Smith(NoV, NoL, roughness);
+          
+            vec3 spec = (F * D * G) / (4.0 * max(NoV, 0.001) * max(NoL, 0.001));
+          
+            vec3 rhoD = baseColor;
+          
+            // optionally
+            rhoD *= vec3(1.0) - F;
+            // rhoD *= disneyDiffuseFactor(NoV, NoL, VoH, roughness);
+          
+            rhoD *= (1.0 - metallic);
+          
+            vec3 diff = rhoD * RECIPROCAL_PI;
+          
+            return diff + spec;
+          }
+          
+          void main() {
+          
+              vec3 baseColor = vColor;
+              
+              if (shading == 1) { baseColor *= texture(myTexture, vTexCoord).rgb; }
+              
+              vec3 L = normalize(lightDir);
+              vec3 V = normalize(-vViewPos);
+              vec3 N = normalize(vNormal);
+              
+              float r = max(roughness, 0.04);
+          
+              vec3 radiance = vec3(0.0);
+          
+              float irradiance = max(dot(L, N), 0.0);
+              if (irradiance > 0.0) {
+                  vec3 brdf = microfacetBRDF(
+                      L, V, N,
+                      metallic,
+                      r,
+                      baseColor,  // baseColor placeholder
+                      1.0 // reflectance placeholder
+                  );
+                  radiance += brdf * irradiance * uIrradiPerp; // ;
+              }
+          
+              if (shadow != 1){
+                  outputColor.rgb = lin2rgb(radiance);
+                  outputColor.a = 1.0;
+              } else {
+                  outputColor = vec4(0.0);
+              }
+          }
+          
+         
+        """
+        };
+
+        gl.glShaderSource(vertID, 1, vs, null, 0);
+        gl.glShaderSource(fragID, 1, fs, null, 0);
+
+        // compile the shader
+        gl.glCompileShader(vertID);
+        gl.glCompileShader(fragID);
+
+        // check for errors
+        printShaderInfoLog(d, vertID);
+        printShaderInfoLog(d, fragID);
+
+        // create program and attach shaders
+        progID = gl.glCreateProgram();
+        gl.glAttachShader(progID, vertID);
+        gl.glAttachShader(progID, fragID);
+
+        // "outColor" is a user-provided OUT variable
+        // of the fragment shader.
+        // Its output is bound to the first color buffer
+        // in the framebuffer
+        gl.glBindFragDataLocation(progID, 0, "outputColor");
+
+        // link the program
+        gl.glLinkProgram(progID);
+        // output error messages
+        printProgramInfoLog(d, progID);
+
+        // "inputPosition" and "inputColor" are user-provided
+        // IN variables of the vertex shader.
+        // Their locations are stored to be used later with
+        // glEnableVertexAttribArray()
+        vertexLoc = gl.glGetAttribLocation(progID, "inputPosition");
+        colorLoc = gl.glGetAttribLocation(progID, "inputColor");
+        texCoordLoc = gl.glGetAttribLocation(progID, "inputTexCoord");
+        normalLoc = gl.glGetAttribLocation(progID, "inputNormal");
+
+        // "projection" and "modelview" are user-provided
+        // UNIFORM variables of the vertex shader.
+        // Their locations are stored to be used later
+        projectionLoc = gl.glGetUniformLocation(progID, "projection");
+        modelviewLoc = gl.glGetUniformLocation(progID, "modelview");
+        normalMatrixLoc =  gl.glGetUniformLocation(progID, "normalMatrix");
+        texLoc = gl.glGetUniformLocation(progID, "myTexture");
+        shadeLoc = gl.glGetUniformLocation(progID, "shading");
+        lightDirLoc = gl.glGetUniformLocation(progID, "lightDir");
+        modeLoc = gl.glGetUniformLocation(progID, "mode");
+        metallicLoc = gl.glGetUniformLocation(progID, "metallic");
+        roughnessLoc = gl.glGetUniformLocation(progID, "roughness");
+        shadowLoc = gl.glGetUniformLocation(progID, "shadow");
+
+    }
+
+    private void printShaderInfoLog(GLAutoDrawable d, int obj) {
+        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
+        IntBuffer infoLogLengthBuf = IntBuffer.allocate(1);
+        int infoLogLength;
+        gl.glGetShaderiv(obj, GL3.GL_INFO_LOG_LENGTH, infoLogLengthBuf);
+        infoLogLength = infoLogLengthBuf.get(0);
+        if (infoLogLength > 0) {
+            ByteBuffer byteBuffer = ByteBuffer.allocate(infoLogLength);
+            gl.glGetShaderInfoLog(obj, infoLogLength, infoLogLengthBuf, byteBuffer);
+            for (byte b : byteBuffer.array()) {
+                System.err.print((char) b);
+            }
+        }
+    }
+
+
+    private void printProgramInfoLog(GLAutoDrawable d, int obj) {
+        GL3 gl = d.getGL().getGL3(); // get the OpenGL 3 graphics context
+        IntBuffer infoLogLengthBuf = IntBuffer.allocate(1);
+        int infoLogLength;
+        gl.glGetProgramiv(obj, GL3.GL_INFO_LOG_LENGTH, infoLogLengthBuf);
+        infoLogLength = infoLogLengthBuf.get(0);
+        if (infoLogLength > 0) {
+            ByteBuffer byteBuffer = ByteBuffer.allocate(infoLogLength);
+            gl.glGetProgramInfoLog(obj, infoLogLength, infoLogLengthBuf, byteBuffer);
+            for (byte b : byteBuffer.array()) {
+                System.err.print((char) b);
+            }
+        }
+    }
+
+    protected void setupVAO(GL3 gl, int vaoId, int vboId, int vertexCount) {
+        gl.glBindVertexArray(vaoId);
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, vboId);
+
+        if (vertexLoc >= 0) {
+            gl.glEnableVertexAttribArray(vertexLoc);
+            gl.glVertexAttribPointer(vertexLoc, 3, GL3.GL_FLOAT, false, Renderer2.STRIDE, 0);
+        }
+
+        long colorOffset = 3 * Buffers.SIZEOF_FLOAT;
+        if (colorLoc >= 0) {
+            gl.glEnableVertexAttribArray(colorLoc);
+            gl.glVertexAttribPointer(colorLoc, 4, GL3.GL_FLOAT, false, Renderer2.STRIDE, colorOffset);
+        }
+
+        long texOffset = (3 + 4) * Buffers.SIZEOF_FLOAT;
+        if (texCoordLoc >= 0) {
+            gl.glEnableVertexAttribArray(texCoordLoc);
+            gl.glVertexAttribPointer(texCoordLoc, 2, GL3.GL_FLOAT, false,Renderer2.STRIDE, texOffset);
+        }
+
+        long normalOffset = (3 + 4 + 2) * Buffers.SIZEOF_FLOAT;
+        if (normalLoc >= 0) {
+            gl.glEnableVertexAttribArray(normalLoc);
+            gl.glVertexAttribPointer(normalLoc, 3, GL3.GL_FLOAT, false, Renderer2.STRIDE, normalOffset);
+        }
+
+        gl.glBindBuffer(GL3.GL_ARRAY_BUFFER, 0);
+        gl.glBindVertexArray(0);
+    }
+}
+
 public class TriangleTransform {
     public static void main(String[] args) {
         System.setProperty("sun.java2d.uiScale", "1.0");
-        javax.swing.SwingUtilities.invokeLater(new Runnable() {
+        SwingUtilities.invokeLater(new Runnable() {
             public void run() {
                 MyGui2 myGUI2 = new MyGui2();
                 myGUI2.createGUI();
