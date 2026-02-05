@@ -73,6 +73,7 @@ class Renderer2 implements GLEventListener {
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 0);
         gl.glUniform1i(shader.firstFeatureLoc, 0);
+        gl.glUniform1i(shader.secondFeatureLoc, 0);
         gl.glBindVertexArray(vaoDigits[digit]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
         gl.glBindVertexArray(0);
@@ -81,6 +82,7 @@ class Renderer2 implements GLEventListener {
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 1);
         gl.glUniform1i(shader.firstFeatureLoc, 0);
+        gl.glUniform1i(shader.secondFeatureLoc, 0);
         gl.glBindVertexArray(vaoDigits[digit]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertexCount);
         gl.glBindVertexArray(0);
@@ -91,6 +93,7 @@ class Renderer2 implements GLEventListener {
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 0);
         gl.glUniform1i(shader.firstFeatureLoc, 0);
+        gl.glUniform1i(shader.secondFeatureLoc, 0);
         gl.glBindVertexArray(vaoBall[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoBall);
         gl.glBindVertexArray(0);
@@ -99,6 +102,7 @@ class Renderer2 implements GLEventListener {
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 1);
         gl.glUniform1i(shader.firstFeatureLoc, 0);
+        gl.glUniform1i(shader.secondFeatureLoc, 0);
         gl.glUniform4f(shader.colorLoc, 0.5f,  0.5f, 0.5f, 1.0f);
         gl.glBindVertexArray(vaoBall[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoBall);
@@ -111,6 +115,7 @@ class Renderer2 implements GLEventListener {
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 0);
         gl.glUniform1i(shader.firstFeatureLoc, 0);
+        gl.glUniform1i(shader.secondFeatureLoc, 0);
         gl.glBindVertexArray(vaoPlayer[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayer);
         gl.glBindVertexArray(0);
@@ -119,6 +124,7 @@ class Renderer2 implements GLEventListener {
         gl.glUniform1i(shader.shadeLoc, 0);
         gl.glUniform1i(shader.shadowLoc, 1);
         gl.glUniform1i(shader.firstFeatureLoc, 0);
+        gl.glUniform1i(shader.secondFeatureLoc, 0);
         gl.glBindVertexArray(vaoPlayer[0]);
         gl.glDrawArrays(GL.GL_TRIANGLES, 0, vertNoPlayer);
         gl.glBindVertexArray(0);
@@ -130,6 +136,7 @@ class Renderer2 implements GLEventListener {
         gl.glUniform1i(shader.shadeLoc, 1);
         gl.glUniform1i(shader.shadowLoc, 0);
         gl.glUniform1i(shader.firstFeatureLoc, 1);
+        gl.glUniform1i(shader.secondFeatureLoc, 1);
         gl.glUniform1f(shader.metallicLoc, 0.0f);
         uploadModel(gl, x, y, -1.2f, 0.0f, rotation, 0.0f, scale, scale, scale);
 
@@ -1002,6 +1009,7 @@ class Shader {
     static int roughnessLoc = 0;
     static int shadeLoc = 0;//Renderer2.shadeLoc;
     static int firstFeatureLoc = 0;
+    static int secondFeatureLoc = 0;
     static int timeLoc = 0;
     static int ballPosLoc = 0;
 
@@ -1066,6 +1074,16 @@ class Shader {
          uniform float time;
          uniform vec2 ballPos;
          uniform int firstFeature;
+         uniform int secondFeature;
+         
+         #define CHS 0.18
+         
+         float sdBox2(in vec2 p,in vec2 b) {vec2 d=abs(p)-b;return length(max(d,vec2(0))) + min(max(d.x,d.y),0.0);}
+         float line2(float d,vec2 p,vec4 l){vec2 pa=p-l.xy;vec2 ba=l.zw-l.xy;float h=clamp(dot(pa,ba)/dot(ba,ba),0.0,1.0);return min(d,length(pa-ba*h));}
+         float TB(vec2 p, float d){p.y=abs(p.y);return line2(d,p,vec4(2,3.25,-2,3.25)*CHS);}
+         float B(vec2 p,float d){ p.y+=1.75*CHS;	d=min(d,abs(sdBox2(p,vec2(2.0,1.5)*CHS))); p+=vec2(0.5,-3.25)*CHS; return min(d,abs(sdBox2(p,vec2(1.5,1.75)*CHS)));}
+         float E(vec2 p,float d){d=TB(p,d);d=line2(d,p,vec4(-2,3.25,-2,-3.25)*CHS);return line2(d,p,vec4(0,-0.25,-2,-0.25)*CHS);} float I(vec2 p,float d){d=line2(d,p,vec4(0,-3.25,0,3.25)*CHS);p.y=abs(p.y);return line2(d,p,vec4(1.5,3.25,-1.5,3.25)*CHS);} float R(vec2 p,float d){d=line2(d,p,vec4(0.5,-0.25,2,-3.25)*CHS);d=line2(d,p,vec4(-2,-3.25,-2,0.0)*CHS);p.y-=1.5*CHS;return min(d, abs(sdBox2(p,vec2(2.0,1.75)*CHS)));} float T(vec2 p,float d){d=line2(d,p,vec4(0,-3.25,0,3.25)*CHS);return line2(d,p,vec4(2,3.25,-2,3.25)*CHS);} float X(vec2 p,float d){d = line2(d,p,vec4(-2,3.25,2,-3.25)*CHS);return line2(d,p,vec4(-2,-3.25,2,3.25)*CHS);}
+         
          
          const vec4 uLightColor = vec4(1.0, 1.0, 1.0, 1.0);
          const float uIrradiPerp = 1.0;
@@ -1151,6 +1169,20 @@ class Shader {
               return fract(sin(dot(floor(co.xy) ,vec2(11,1)+tan(time*0.01)))*500.0);
           }
           
+          float GetText(vec2 uv)
+          {
+          	uv.x += 2.75;
+          	uv.y += sin(uv.x*0.4+time*8.3)*0.8;
+          
+          		float d = B(uv,1.0);uv.x -= 77.1;
+          		d = R(uv,d);uv.x -= 1.1;
+          		d = E(uv,d);uv.x -= 1.1;
+          		d = X(uv,d);	uv.x -= 1.1;
+          		d = I(uv,d);uv.x -= 1.1;
+          		d = T(uv,d);
+          	return smoothstep(0.0,0.2,d-0.22*CHS);
+          }
+          
           void main() {
               vec3 baseColor;
               vec4 fragColor;
@@ -1170,6 +1202,27 @@ class Shader {
                 baseColor = vColor;
               }
               
+              float e = resolution.x*0.075;  // eye size relative to screen
+              float b = e*0.3;              // pupil size relative to eye size
+              vec2 m = resolution*vec2(0.5); // position of eyes
+              vec2 mx = vec2(ballPos.x, ballPos.y)*2.-1.;
+              m.x += ((gl_FragCoord.x<m.x)?-e:e)*1.5; // 1.05 for a gap between eyes
+              vec2 t = vec2(  mx.x*5.-1. ,mx.y*5.0)*30.0;
+              vec2 mm = (t * 0.008)+0.5;
+              m -= gl_FragCoord.xy;
+              
+                vec3 col  = vec3(
+              	max(0.,min( e-length(m), length(m+t/max(2.0,length(t)/(e-b)))-b)) );
+              	col+=1.-GetText((gl_FragCoord.xy/resolution-mm)*1.);
+              
+              	float cc = 0.5+sin(-time+(gl_FragCoord.y/resolution.y)*4.4)*0.5;
+              	col += vec3(0.8,0.4,0.2)*cc;
+              
+              if (secondFeature == 1) {
+              	baseColor = baseColor * col;
+              } else {
+                baseColor = vColor;
+                }
               
               if (shading == 1) { baseColor *= texture(myTexture, vTexCoord).rgb; }
               
@@ -1255,6 +1308,7 @@ class Shader {
         roughnessLoc = gl.glGetUniformLocation(progID, "roughness");
         shadowLoc = gl.glGetUniformLocation(progID, "shadow");
         firstFeatureLoc = gl.glGetUniformLocation(progID, "firstFeature");
+        secondFeatureLoc = gl.glGetUniformLocation(progID, "secondFeature");
         timeLoc = gl.glGetUniformLocation(progID, "time");
         ballPosLoc = gl.glGetUniformLocation(progID, "ballPos");
 
